@@ -1,8 +1,7 @@
 import { Container, Graphics } from "pixi.js";
+import { MAP_LAYOUT } from "../config/map";
 import {
-  ENEMY_START,
   PALETTE,
-  PLAYER_START,
   TILE_SIZE,
   WORLD_HEIGHT,
   WORLD_WIDTH,
@@ -19,10 +18,18 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-export function buildWorldScene(world: Container): void {
-  const rand = mulberry32(1337);
-  const terrain = new Graphics();
+function baseCenters(): Array<{ x: number; y: number }> {
+  return (["player", "enemy"] as const).map((id) => {
+    const tile = MAP_LAYOUT[id].baseTile;
+    return { x: tile.x * TILE_SIZE, y: tile.y * TILE_SIZE };
+  });
+}
 
+export function buildWorldScene(world: Container): Container {
+  const rand = mulberry32(1337);
+  const terrainLayer = new Container();
+
+  const terrain = new Graphics();
   terrain.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).fill(PALETTE.ground);
 
   for (let i = 0; i < 90; i += 1) {
@@ -54,67 +61,38 @@ export function buildWorldScene(world: Container): void {
   const territory = new Graphics();
   territory
     .rect(0, WORLD_HEIGHT * 0.62, WORLD_WIDTH, WORLD_HEIGHT * 0.38)
-    .fill({ color: PALETTE.playerTint, alpha: 0.1 });
+    .fill({ color: PALETTE.playerTint, alpha: 0.09 });
   territory
     .rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT * 0.38)
-    .fill({ color: PALETTE.enemyTint, alpha: 0.1 });
+    .fill({ color: PALETTE.enemyTint, alpha: 0.09 });
+  territory
+    .rect(0, WORLD_HEIGHT * 0.62 - 2, WORLD_WIDTH, 3)
+    .fill({ color: PALETTE.playerTint, alpha: 0.4 });
+  territory
+    .rect(0, WORLD_HEIGHT * 0.38, WORLD_WIDTH, 3)
+    .fill({ color: PALETTE.enemyTint, alpha: 0.4 });
 
   const decor = new Graphics();
-  const occupied: Array<{ x: number; y: number }> = [PLAYER_START, ENEMY_START];
-  for (let i = 0; i < 140; i += 1) {
+  const occupied = baseCenters();
+  for (let i = 0; i < 160; i += 1) {
     const x = 80 + rand() * (WORLD_WIDTH - 160);
     const y = 80 + rand() * (WORLD_HEIGHT - 160);
-    const nearBase = occupied.some((p) => Math.hypot(p.x - x, p.y - y) < 260);
-    const nearRoad = Math.abs(y - roadY) < 120;
+    const nearBase = occupied.some((p) => Math.hypot(p.x - x, p.y - y) < 340);
+    const nearRoad = Math.abs(y - roadY) < 130;
     if (nearBase || nearRoad) continue;
 
     if (rand() < 0.78) {
-      const r = 10 + rand() * 10;
+      const r = 9 + rand() * 9;
       decor.circle(x, y + r * 0.7, r * 0.9).fill({ color: 0x000000, alpha: 0.12 });
       decor.circle(x, y, r).fill(PALETTE.tree);
       decor.circle(x - r * 0.3, y - r * 0.4, r * 0.7).fill(PALETTE.treeCanopy);
     } else {
-      const r = 5 + rand() * 7;
+      const r = 5 + rand() * 6;
       decor.ellipse(x, y, r * 1.2, r).fill(PALETTE.rock);
     }
   }
 
-  world.addChild(terrain, territory, decor);
-
-  world.addChild(makeBase(PLAYER_START.x, PLAYER_START.y, PALETTE.playerUnit, rand));
-  world.addChild(makeBase(ENEMY_START.x, ENEMY_START.y, PALETTE.enemyUnit, rand));
-}
-
-function makeBase(
-  x: number,
-  y: number,
-  accent: number,
-  rand: () => number,
-): Container {
-  const group = new Container();
-  group.position.set(x, y);
-
-  const plaza = new Graphics();
-  plaza.ellipse(0, 0, 150, 110).fill({ color: accent, alpha: 0.16 });
-  plaza.ellipse(0, 0, 150, 110).stroke({ width: 3, color: accent, alpha: 0.5 });
-  group.addChild(plaza);
-
-  const hall = new Graphics();
-  hall.roundRect(-70, -58, 140, 96, 12).fill(PALETTE.building);
-  hall.roundRect(-70, -58, 140, 96, 12).stroke({ width: 4, color: PALETTE.outline, alpha: 0.8 });
-  hall.poly([-84, -58, 0, -118, 84, -58]).fill(PALETTE.buildingRoof);
-  hall.poly([-84, -58, 0, -118, 84, -58]).stroke({ width: 4, color: PALETTE.outline, alpha: 0.8 });
-  group.addChild(hall);
-
-  const units = new Graphics();
-  for (let i = 0; i < 6; i += 1) {
-    const angle = (i / 6) * Math.PI * 2;
-    const ux = Math.cos(angle) * (110 + rand() * 40);
-    const uy = Math.sin(angle) * (80 + rand() * 30);
-    units.circle(ux, uy, 14).fill(accent);
-    units.circle(ux, uy, 14).stroke({ width: 3, color: PALETTE.outline, alpha: 0.8 });
-  }
-  group.addChild(units);
-
-  return group;
+  terrainLayer.addChild(terrain, territory, decor);
+  world.addChild(terrainLayer);
+  return terrainLayer;
 }

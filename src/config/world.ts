@@ -32,3 +32,16 @@ export const CAMERA = {
   maxZoom: 2.5,
   panSpeed: 900,
 } as const;
+
+export const TERRITORY = {
+  playerStartRow: Math.ceil(GRID_ROWS * 0.62),
+  enemyEndRow: Math.floor(GRID_ROWS * 0.38),
+} as const;
+
+export function tileToWorld(tileX: number, tileY: number): { x: number; y: number } {
+  return { x: tileX * TILE_SIZE, y: tileY * TILE_SIZE };
+}
+
+export function worldToTile(worldX: number, worldY: number): { x: number; y: number } {
+  return { x: Math.floor(worldX / TILE_SIZE), y: Math.floor(worldY / TILE_SIZE) };
+}
