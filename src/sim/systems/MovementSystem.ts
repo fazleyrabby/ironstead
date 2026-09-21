@@ -21,6 +21,8 @@ export class MovementSystem {
 
     units.forEach((unit, index) => {
       unit.assignedBuildingId = undefined;
+      unit.targetKind = undefined;
+      unit.targetId = undefined;
       const col = index % cols;
       const row = Math.floor(index / cols);
       const offsetX = (col - (cols - 1) / 2) * FORMATION_SPACING;
@@ -32,6 +34,8 @@ export class MovementSystem {
   orderAssign(units: Unit[], building: Building): void {
     units.forEach((unit, index) => {
       unit.assignedBuildingId = building.id;
+      unit.targetKind = undefined;
+      unit.targetId = undefined;
       const angle = (index / Math.max(units.length, 1)) * Math.PI * 2;
       const reachX = building.width / 2 + 24;
       const reachY = building.height / 2 + 24;

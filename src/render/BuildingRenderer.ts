@@ -15,6 +15,7 @@ interface Entry {
   progress: Graphics;
   state: string;
   selected: boolean;
+  hpBucket: number;
 }
 
 export class BuildingRenderer {
@@ -57,7 +58,7 @@ export class BuildingRenderer {
     const progress = new Graphics();
     container.addChild(body, overlay, progress);
     this.layer.addChild(container);
-    return { container, body, overlay, progress, state: "", selected: false };
+    return { container, body, overlay, progress, state: "", selected: false, hpBucket: -1 };
   }
 
   private sync(entry: Entry, building: Building, selected: boolean): void {
@@ -68,16 +69,11 @@ export class BuildingRenderer {
       drawBody(entry.body, building);
     }
 
-    if (entry.selected !== selected) {
+    const hpBucket = Math.ceil((building.hp / building.maxHp) * 12);
+    if (entry.selected !== selected || entry.hpBucket !== hpBucket) {
       entry.selected = selected;
-      entry.overlay.clear();
-      if (selected) {
-        const w = building.width;
-        const h = building.height;
-        entry.overlay
-          .roundRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 8)
-          .stroke({ width: 3, color: 0xffe066, alpha: 0.95 });
-      }
+      entry.hpBucket = hpBucket;
+      redrawOverlay(entry.overlay, building, selected);
     }
 
     entry.progress.clear();
@@ -93,6 +89,31 @@ export class BuildingRenderer {
         .roundRect(x, y, barW * building.buildProgress, 8, 4)
         .fill({ color: 0x7ee081 });
     }
+  }
+}
+
+function redrawOverlay(g: Graphics, building: Building, selected: boolean): void {
+  g.clear();
+  const w = building.width;
+  const h = building.height;
+
+  if (selected) {
+    g.roundRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 8).stroke({
+      width: 3,
+      color: 0xffe066,
+      alpha: 0.95,
+    });
+  }
+
+  if (building.hp < building.maxHp) {
+    const barW = Math.max(w, 36);
+    const x = -barW / 2;
+    const y = -h / 2 - 15;
+    const ratio = Math.max(0, Math.min(1, building.hp / building.maxHp));
+    g.roundRect(x, y, barW, 6, 3).fill({ color: 0x000000, alpha: 0.6 });
+    g.roundRect(x, y, barW * ratio, 6, 3).fill({
+      color: ratio > 0.55 ? 0x7ee081 : ratio > 0.25 ? 0xf2c14e : 0xef4444,
+    });
   }
 }
 

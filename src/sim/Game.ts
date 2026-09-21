@@ -7,9 +7,11 @@ import { createInitialState, spawnBuilding, spawnUnit } from "./GameState";
 import { NavGrid } from "./navgrid";
 import { nearestFreeTile, tileToWorldCenter } from "./pathfinding";
 import { ConstructionSystem } from "./systems/ConstructionSystem";
+import { CombatSystem } from "./systems/CombatSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { MovementSystem } from "./systems/MovementSystem";
 import { ProductionSystem } from "./systems/ProductionSystem";
+import { ProjectileSystem } from "./systems/ProjectileSystem";
 import type { Building, BuildingType, GameState, PlayerId, Unit } from "./types";
 
 const STARTING_VILLAGERS = 4;
@@ -20,9 +22,11 @@ export class Game {
   readonly events: EventBus;
   readonly movement: MovementSystem;
   readonly production: ProductionSystem;
+  readonly combat: CombatSystem;
 
   private readonly economy = new EconomySystem();
   private readonly construction: ConstructionSystem;
+  private readonly projectiles: ProjectileSystem;
   private readonly queue: Command[] = [];
 
   constructor(events: EventBus) {
@@ -32,6 +36,8 @@ export class Game {
     this.construction = new ConstructionSystem(events);
     this.movement = new MovementSystem(this.nav);
     this.production = new ProductionSystem(events, this.nav);
+    this.combat = new CombatSystem(events, this.nav);
+    this.projectiles = new ProjectileSystem(events, this.nav);
     this.rebuildNav();
     this.spawnStartingUnits();
   }
@@ -49,6 +55,8 @@ export class Game {
     this.economy.update(this.state, dt);
     this.construction.update(this.state, dt);
     this.production.update(this.state, dt);
+    this.combat.update(this.state, dt);
+    this.projectiles.update(this.state, dt);
     this.movement.update(this.state, dt);
     this.state.time += dt;
   }
@@ -168,6 +176,22 @@ export class Game {
       }
       case "MOVE_UNITS": {
         this.movement.orderMove(this.playerUnits(command.unitIds), command.x, command.y);
+        break;
+      }
+      case "ATTACK_TARGET": {
+        const enemy = this.state.players.enemy;
+        const valid =
+          command.targetKind === "unit"
+            ? enemy.units.some((unit) => unit.id === command.targetId && unit.state !== "dead")
+            : enemy.buildings.some(
+                (building) => building.id === command.targetId && building.state !== "destroyed",
+              );
+        if (!valid) break;
+        this.combat.orderAttack(
+          this.playerUnits(command.unitIds),
+          command.targetKind,
+          command.targetId,
+        );
         break;
       }
       case "ASSIGN_WORKERS": {

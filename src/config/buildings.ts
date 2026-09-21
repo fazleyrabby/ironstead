@@ -6,6 +6,12 @@ export interface BuildingProduction {
   perWorker: number;
 }
 
+export interface BuildingAttack {
+  range: number;
+  damage: number;
+  cooldown: number;
+}
+
 export interface BuildingDefinition {
   id: BuildingType;
   name: string;
@@ -18,6 +24,7 @@ export interface BuildingDefinition {
   population: number;
   storage: number;
   production?: BuildingProduction;
+  attack?: BuildingAttack;
   produces?: UnitType[];
   maxWorkers?: number;
   buildable: boolean;
@@ -110,6 +117,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     buildTime: 10,
     population: 0,
     storage: 0,
+    attack: { range: 250, damage: 25, cooldown: 1.2 },
     buildable: true,
     colors: { body: 0x9ca3af, roof: 0x4b5563, accent: 0xc3c9d2 },
   },
@@ -161,7 +169,14 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   },
 };
 
-export const BUILDABLE_TYPES: readonly BuildingType[] = ["house", "farm", "storage", "army_camp"];
+export const BUILDABLE_TYPES: readonly BuildingType[] = [
+  "house",
+  "farm",
+  "storage",
+  "army_camp",
+  "tower",
+  "wall",
+];
 
 export const BUILDING_ICONS: Record<BuildingType, string> = {
   town_center: "\u{1F3F0}",

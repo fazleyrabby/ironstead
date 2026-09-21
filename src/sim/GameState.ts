@@ -41,6 +41,7 @@ export function spawnBuilding(
     buildProgress: complete ? 1 : 0,
     workerCount: 0,
     queue: [],
+    cooldown: 0,
   };
 }
 
@@ -63,6 +64,10 @@ export function spawnUnit(
     state: "idle",
     path: [],
     assignedBuildingId: undefined,
+    targetKind: undefined,
+    targetId: undefined,
+    attackTimer: 0,
+    repathTimer: 0,
   };
 }
 
@@ -83,6 +88,7 @@ export function createInitialState(): GameState {
       player: createPlayer("player"),
       enemy: createPlayer("enemy"),
     },
+    projectiles: [],
     ui: { selectedUnitIds: [] },
     nextId: 1,
   };

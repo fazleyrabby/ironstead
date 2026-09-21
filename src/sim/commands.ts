@@ -8,4 +8,5 @@ export type Command =
   | { type: "SELECT_UNITS"; unitIds: string[] }
   | { type: "TRAIN_UNIT"; buildingId: string; unitType: UnitType }
   | { type: "MOVE_UNITS"; unitIds: string[]; x: number; y: number }
+  | { type: "ATTACK_TARGET"; unitIds: string[]; targetKind: "unit" | "building"; targetId: string }
   | { type: "ASSIGN_WORKERS"; unitIds: string[]; buildingId: string };

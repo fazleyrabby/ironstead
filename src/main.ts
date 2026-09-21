@@ -7,14 +7,17 @@ import { InputManager } from "./input/InputManager";
 import { BuildingRenderer } from "./render/BuildingRenderer";
 import { Camera } from "./render/Camera";
 import { PlacementGhost } from "./render/PlacementGhost";
+import { ProjectileRenderer } from "./render/ProjectileRenderer";
 import { SelectionBox } from "./render/SelectionBox";
 import { UnitRenderer } from "./render/UnitRenderer";
 import { buildWorldScene } from "./render/WorldScene";
 import { Game } from "./sim/Game";
+import { spawnUnit } from "./sim/GameState";
 import { buildingAtTile, def, unitDef } from "./sim/selectors";
 import { canPlace } from "./sim/placement";
 import type { PlacementResult } from "./sim/placement";
-import type { BuildingType } from "./sim/types";
+import { tileToWorldCenter } from "./sim/pathfinding";
+import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
 
@@ -52,8 +55,9 @@ async function main(): Promise<void> {
 
   const buildingLayer = new Container();
   const unitLayer = new Container();
+  const projectileLayer = new Container();
   const ghostLayer = new Container();
-  world.addChild(buildingLayer, unitLayer, ghostLayer);
+  world.addChild(buildingLayer, unitLayer, projectileLayer, ghostLayer);
 
   const events = new EventBus();
   const game = new Game(events);
@@ -66,6 +70,7 @@ async function main(): Promise<void> {
 
   const buildingRenderer = new BuildingRenderer(buildingLayer);
   const unitRenderer = new UnitRenderer(unitLayer);
+  const projectileRenderer = new ProjectileRenderer(projectileLayer);
   const ghost = new PlacementGhost(ghostLayer);
   const selectionBox = new SelectionBox(screenLayer);
   const hud = new Hud(hudTop);
@@ -83,6 +88,21 @@ async function main(): Promise<void> {
     let best: (typeof player.units)[number] | undefined;
     let bestScore = 18;
     for (const unit of player.units) {
+      if (unit.state === "dead") continue;
+      const score = Math.hypot(unit.x - worldX, unit.y - worldY) - unitDef(unit.type).radius;
+      if (score < bestScore) {
+        bestScore = score;
+        best = unit;
+      }
+    }
+    return best;
+  }
+
+  function enemyUnitAtPoint(worldX: number, worldY: number) {
+    const enemy = game.state.players.enemy;
+    let best: (typeof enemy.units)[number] | undefined;
+    let bestScore = 18;
+    for (const unit of enemy.units) {
       if (unit.state === "dead") continue;
       const score = Math.hypot(unit.x - worldX, unit.y - worldY) - unitDef(unit.type).radius;
       if (score < bestScore) {
@@ -159,7 +179,30 @@ async function main(): Promise<void> {
     if (selectedIds.length === 0) return;
 
     const worldPoint = camera.screenToWorld(screenX, screenY);
+
+    const enemyUnit = enemyUnitAtPoint(worldPoint.x, worldPoint.y);
+    if (enemyUnit) {
+      game.execute({
+        type: "ATTACK_TARGET",
+        unitIds: selectedIds,
+        targetKind: "unit",
+        targetId: enemyUnit.id,
+      });
+      return;
+    }
+
     const tile = worldToTile(worldPoint.x, worldPoint.y);
+    const enemyBuilding = buildingAtTile(game.state.players.enemy, tile.x, tile.y);
+    if (enemyBuilding) {
+      game.execute({
+        type: "ATTACK_TARGET",
+        unitIds: selectedIds,
+        targetKind: "building",
+        targetId: enemyBuilding.id,
+      });
+      return;
+    }
+
     const target = buildingAtTile(game.state.players.player, tile.x, tile.y);
 
     if (target && def(target.type).maxWorkers) {
@@ -196,6 +239,19 @@ async function main(): Promise<void> {
     console.debug("[rts] placement rejected:", reason);
   });
 
+  if (import.meta.env.DEV) {
+    (window as unknown as { __rts?: unknown }).__rts = {
+      game,
+      camera,
+      spawn: (type: UnitType, owner: PlayerId, tileX: number, tileY: number): string => {
+        const point = tileToWorldCenter(tileX, tileY);
+        const unit = spawnUnit(game.state, owner, type, point.x, point.y);
+        game.state.players[owner].units.push(unit);
+        return unit.id;
+      },
+    };
+  }
+
   const loop = new GameLoop(
     (dt) => {
       camera.update(dt);
@@ -214,6 +270,7 @@ async function main(): Promise<void> {
       ghost.update(game.state.ui, result);
       buildingRenderer.update(game.state, game.state.ui.selectedBuildingId);
       unitRenderer.update(game.state, game.state.ui.selectedUnitIds);
+      projectileRenderer.update(game.state.projectiles);
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state);
       commandPanel.update(game.state);

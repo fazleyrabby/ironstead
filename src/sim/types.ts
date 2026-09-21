@@ -42,6 +42,7 @@ export interface Building {
   buildProgress: number;
   workerCount: number;
   queue: TrainOrder[];
+  cooldown: number;
 }
 
 export type UnitType = "villager" | "swordsman" | "spearman" | "crossbowman" | "horse_rider";
@@ -59,6 +60,21 @@ export interface Unit {
   state: UnitState;
   path: Array<{ x: number; y: number }>;
   assignedBuildingId?: string;
+  targetKind?: "unit" | "building";
+  targetId?: string;
+  attackTimer: number;
+  repathTimer: number;
+}
+
+export interface Projectile {
+  id: string;
+  owner: PlayerId;
+  x: number;
+  y: number;
+  speed: number;
+  damage: number;
+  targetKind: "unit" | "building";
+  targetId: string;
 }
 
 export interface PlayerState {
@@ -81,6 +97,7 @@ export interface GameState {
   status: GameStatus;
   time: number;
   players: Record<PlayerId, PlayerState>;
+  projectiles: Projectile[];
   ui: UiState;
   nextId: number;
 }
