@@ -46,6 +46,7 @@ export class Game {
   private readonly aiPlayer = new AISystem("player");
   private readonly queue: Command[] = [];
   private visibilityTimer = 0;
+  private cleanupTimer = 0;
 
   /** When true the player is also driven by the AI (test / demo mode). */
   autoPlay = false;
@@ -94,6 +95,12 @@ export class Game {
     if (this.autoPlay) this.aiPlayer.update(this, dt);
     this.state.time += dt;
 
+    this.cleanupTimer += dt;
+    if (this.cleanupTimer >= 0.5) {
+      this.cleanupTimer = 0;
+      this.compact();
+    }
+
     this.visibilityTimer += dt;
     if (this.visibilityTimer >= VISIBILITY_INTERVAL) {
       this.visibilityTimer = 0;
@@ -103,8 +110,30 @@ export class Game {
     this.checkOutcome();
   }
 
-  private checkOutcome(): void {
-    if (this.state.status !== "playing") return;
+  // Dead units and destroyed buildings are flagged, not removed, so systems can
+  // resolve final hits. Sweep them out periodically to keep per-tick scans and
+  // arrays bounded over long matches.
+  private compact(): void {
+    for (const id of ["player", "enemy"] as const) {
+      const player = this.state.players[id];
+      if (player.units.some((unit) => unit.state === "dead")) {
+        player.units = player.units.filter((unit) => unit.state !== "dead");
+      }
+      if (player.buildings.some((building) => building.state === "destroyed")) {
+        player.buildings = player.buildings.filter((building) => building.state !== "destroyed");
+      }
+    }
+
+    const alive = new Set<string>();
+    for (const id of ["player", "enemy"] as const) {
+      for (const unit of this.state.players[id].units) alive.add(unit.id);
+    }
+    this.state.ui.selectedUnitIds = this.state.ui.selectedUnitIds.filter((unitId) =>
+      alive.has(unitId),
+    );
+  }
+
+  private checkOutcome(): void {    if (this.state.status !== "playing") return;
 
     const hasTownCenter = (id: PlayerId): boolean =>
       this.state.players[id].buildings.some(

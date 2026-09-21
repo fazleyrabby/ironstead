@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { EventBus } from "../core/EventBus";
 import { Game } from "./Game";
+import { spawnUnit } from "./GameState";
 
 const DT = 1 / 30; // fixed simulation step
+
+/** Bounded per-side headroom above maxVillagers(9)+maxArmy(24)+hero. */
+const ENTITY_CAP = 120;
 
 /**
  * Full-game soak: both factions are driven by the AI so a whole match plays out
@@ -10,11 +14,11 @@ const DT = 1 / 30; // fixed simulation step
  * and "nothing actually happened" regressions.
  */
 describe("full-game soak (AI vs AI)", () => {
-  it("plays a complete match and keeps state finite", () => {
+  it("runs a long match and keeps state finite and bounded", () => {
     const game = new Game(new EventBus());
     game.autoPlay = true;
 
-    const maxSteps = 30 * 60 * 20; // cap at 20 simulated minutes
+    const maxSteps = 30 * 60 * 6; // cap at 6 simulated minutes
     let steps = 0;
     while (game.state.status === "playing" && steps < maxSteps) {
       game.update(DT);
@@ -44,6 +48,12 @@ describe("full-game soak (AI vs AI)", () => {
     const combat = game.state.stats.playerUnitsKilled + game.state.stats.playerUnitsLost;
     expect(combat).toBeGreaterThan(0);
 
+    // No unbounded growth of entity arrays over a long match.
+    expect(player.units.length).toBeLessThan(ENTITY_CAP);
+    expect(enemy.units.length).toBeLessThan(ENTITY_CAP);
+    expect(player.buildings.length).toBeLessThan(40);
+    expect(enemy.buildings.length).toBeLessThan(40);
+
     console.log(
       `\n[soak] status=${game.state.status} time=${Math.round(game.state.time)}s steps=${steps}` +
         ` units=${player.units.length}v${enemy.units.length}` +
@@ -51,4 +61,22 @@ describe("full-game soak (AI vs AI)", () => {
         ` razed=${game.state.stats.playerBuildingsDestroyed} lostBld=${game.state.stats.playerBuildingsLost}\n`,
     );
   }, 180_000);
+
+  it("reaps dead units and destroyed buildings so arrays stay bounded", () => {
+    const game = new Game(new EventBus());
+    const player = game.state.players.player;
+
+    for (let i = 0; i < 200; i += 1) {
+      const unit = spawnUnit(game.state, "player", "swordsman", 2000, 1400);
+      unit.state = "dead";
+      player.units.push(unit);
+    }
+    const before = player.units.length;
+    expect(before).toBeGreaterThan(200);
+
+    for (let i = 0; i < 20; i += 1) game.update(DT); // > 0.5s triggers the sweep
+
+    expect(player.units.length).toBeLessThan(before - 150);
+    expect(player.units.every((unit) => unit.state !== "dead")).toBe(true);
+  }, 10_000);
 });

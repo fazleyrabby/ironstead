@@ -224,17 +224,22 @@ export class AISystem {
     const cy = townCenter.tileY + 2;
 
     const candidates: Array<{ x: number; y: number }> = [{ x: cx, y: cy }];
-    for (let radius = 1; radius <= 16; radius += 1) {
-      for (let dy = -radius; dy <= radius; dy += 1) {
+    const maxCandidates = 240;
+    for (let radius = 1; radius <= 10 && candidates.length < maxCandidates; radius += 1) {
+      for (let dy = -radius; dy <= radius && candidates.length < maxCandidates; dy += 1) {
         for (let dx = -radius; dx <= radius; dx += 1) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
           candidates.push({ x: cx + dx, y: cy + dy });
+          if (candidates.length >= maxCandidates) break;
         }
       }
     }
 
+    let attempts = 0;
     for (const candidate of candidates) {
-      if (!canPlace(state, game.nav, "enemy", type, candidate.x, candidate.y).ok) continue;
+      if (!canPlace(state, game.nav, this.faction, type, candidate.x, candidate.y).ok) continue;
+      attempts += 1;
+      if (attempts > 60) break;
       if (this.connected(game, townCenter, candidate.x, candidate.y, definition.tilesW, definition.tilesH)) {
         return candidate;
       }
@@ -261,7 +266,7 @@ export class AISystem {
     visited[startY * nav.cols + startX] = 1;
     let visits = 0;
 
-    while (queue.length > 0 && visits < 4000) {
+    while (queue.length > 0 && visits < 1500) {
       const current = queue.pop() as number;
       visits += 1;
       const cx = current % nav.cols;

@@ -313,7 +313,7 @@ async function main(): Promise<void> {
       if (code === "KeyT" && game.state.status === "playing") {
         game.autoPlay = !game.autoPlay;
         loop.timeScale = game.autoPlay ? 5 : 1;
-        loop.maxSteps = game.autoPlay ? 30 : 5;
+        loop.maxSteps = game.autoPlay ? 12 : 5;
         hud.setTestMode(game.autoPlay);
       }
       if (code === "KeyM") {
