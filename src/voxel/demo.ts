@@ -24,7 +24,7 @@ function buildTerrainFromNav(nav: import("../sim/navgrid").NavGrid): VoxelNav {
 
 const root = document.getElementById("root")!;
 const scene = new VoxelScene(root, COLS, ROWS);
-const game = new Game(new EventBus(), { seed: 4242 });
+const game = new Game(new EventBus());
 game.autoPlay = true;
 
 const terrain = buildTerrainFromNav(game.nav);
