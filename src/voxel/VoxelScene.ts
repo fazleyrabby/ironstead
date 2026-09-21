@@ -1,6 +1,9 @@
 import * as THREE from "three";
+import { GRID_COLS, GRID_ROWS } from "../config/world";
 import { VoxelNav } from "./VoxelNav";
 import { VoxelWorld } from "./VoxelWorld";
+import { syncEntities } from "./VoxelAssets";
+import type { GameState } from "../sim/types";
 
 const LOWRES_W = 320;
 const LOWRES_H = 180;
@@ -15,10 +18,11 @@ export class VoxelScene {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   readonly world: VoxelWorld;
+  readonly entities: THREE.Group;
   private readonly composeRoot: HTMLElement;
   readonly nav: VoxelNav;
 
-  constructor(composeRoot: HTMLElement, cols = 32, rows = 32) {
+  constructor(composeRoot: HTMLElement, cols = GRID_COLS, rows = GRID_ROWS) {
     this.composeRoot = composeRoot;
     this.renderer = new THREE.WebGLRenderer({ canvas: this.makeCanvas(), antialias: false });
     this.renderer.setPixelRatio(1);
@@ -43,6 +47,9 @@ export class VoxelScene {
     this.world = new VoxelWorld(false);
     this.scene.add(this.world.group);
 
+    this.entities = new THREE.Group();
+    this.scene.add(this.entities);
+
     this.nav = new VoxelNav(cols, rows);
     this.composeRoot.appendChild(this.renderer.domElement);
   }
@@ -53,6 +60,11 @@ export class VoxelScene {
     c.style.width = "100%";
     c.style.height = "100%";
     return c;
+  }
+
+  /** Re-render entity meshes from a GameState (call once per sim step). */
+  renderState(state: GameState): void {
+    syncEntities(this.entities, state);
   }
 
   /** Render the low-res scene. The canvas is CSS-pixel-scaled and

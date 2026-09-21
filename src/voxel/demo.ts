@@ -1,46 +1,60 @@
+import { EventBus } from "../core/EventBus";
+import { Game } from "../sim/Game";
 import { VoxelNav } from "./VoxelNav";
 import { VoxelScene } from "./VoxelScene";
 
-const COLS = 24;
-const ROWS = 24;
+const COLS = 48;
+const ROWS = 48;
+const DT = 1 / 30;
 
-function buildSampleNav(): VoxelNav {
-  const nav = new VoxelNav(COLS, ROWS);
-  // ground height 1 everywhere by default
+/** Flat ground map from the game's terrain/nav so the voxel demo matches reality.
+ *  Water (unbuildable/unwalkable tiles) becomes height-0; the rest is ground. */
+function buildTerrainFromNav(nav: import("../sim/navgrid").NavGrid): VoxelNav {
+  const out = new VoxelNav(COLS, ROWS, 2);
+  // walkable + non-bridged tiles are ground height 1; blocked (water/edges) stay 0
   for (let y = 0; y < ROWS; y += 1) {
     for (let x = 0; x < COLS; x += 1) {
-      nav.setGround(x, y, 1);
+      if (nav.inBounds(x, y) && !nav.isBlocked(x, y)) out.setGround(x, y, 1);
     }
   }
-  // carve a horizontal river (water) in columns 9..14
-  for (let y = 0; y < ROWS; y += 1) {
-    for (let x = 9; x <= 14; x += 1) {
-      nav.setGround(x, y, 0);
-    }
-  }
-  // bridge across the river at columns 11..12
-  for (let y = 0; y < ROWS; y += 1) {
-    nav.setBridge(11, y, true);
-    nav.setBridge(12, y, true);
-  }
-  return nav;
+  // bridges: none by default in this flat demo, but keep the layer wired
+  out.syncToNav(nav);
+  return out;
 }
 
 const root = document.getElementById("root")!;
 const scene = new VoxelScene(root, COLS, ROWS);
-const nav = buildSampleNav();
-scene.world.build(nav);
+const game = new Game(new EventBus(), { seed: 4242 });
+game.autoPlay = true;
 
+const terrain = buildTerrainFromNav(game.nav);
+scene.world.build(terrain);
+
+// dev hook for smoke-testing the render
+(window as unknown as { __voxel: unknown }).__voxel = { scene, game };
+
+const CAM_DIST = 26;
 let frame = 0;
 function loop(): void {
   frame += 1;
-  // slow turntable so the water/bridge/ground layers are visible
+  // advance the sim faster than realtime so the base develops, then render
+  for (let i = 0; i < 6; i += 1) game.update(DT);
+  scene.renderState(game.state);
+
+  // turntable so the whole base + army is visible
   scene.camera.position.set(
-    Math.cos(frame / 240) * 26,
-    18 + Math.sin(frame / 360) * 2,
-    Math.sin(frame / 240) * 26,
+    Math.cos(frame / 360) * CAM_DIST,
+    18 + Math.sin(frame / 540) * 2,
+    Math.sin(frame / 360) * CAM_DIST,
   );
-  scene.camera.lookAt(0, 0, 0);
+  scene.camera.lookAt(
+    game.state.players.player.units.reduce((ax, u) => ax + u.x / 32, 0) /
+      Math.max(1, game.state.players.player.units.length),
+    0,
+    game.state.players.player.units.reduce((az, u) => az + u.y / 32, 0) /
+      Math.max(1, game.state.players.player.units.length),
+  );
+
   scene.render();
   requestAnimationFrame(loop);
 }
