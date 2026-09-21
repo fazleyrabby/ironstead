@@ -258,6 +258,9 @@ async function main(): Promise<void> {
     (window as unknown as { __rts?: unknown }).__rts = {
       game,
       camera,
+      setSpeed: (n: number): void => {
+        loop.timeScale = n;
+      },
       spawn: (type: UnitType, owner: PlayerId, tileX: number, tileY: number): string => {
         const point = tileToWorldCenter(tileX, tileY);
         const unit = spawnUnit(game.state, owner, type, point.x, point.y);

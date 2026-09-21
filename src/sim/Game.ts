@@ -10,6 +10,7 @@ import { nearestFreeTile, tileToWorldCenter } from "./pathfinding";
 import { createVisibility, updateVisibility } from "./visibility";
 import type { VisibilityMap } from "./visibility";
 import { ConstructionSystem } from "./systems/ConstructionSystem";
+import { AISystem } from "./systems/AISystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { EconomySystem } from "./systems/EconomySystem";
 import { MovementSystem } from "./systems/MovementSystem";
@@ -32,6 +33,7 @@ export class Game {
   private readonly economy = new EconomySystem();
   private readonly construction: ConstructionSystem;
   private readonly projectiles: ProjectileSystem;
+  private readonly ai = new AISystem();
   private readonly queue: Command[] = [];
   private visibilityTimer = 0;
 
@@ -69,6 +71,7 @@ export class Game {
     this.combat.update(this.state, this.visibility, dt);
     this.projectiles.update(this.state, dt);
     this.movement.update(this.state, dt);
+    this.ai.update(this, dt);
     this.state.time += dt;
 
     this.visibilityTimer += dt;
@@ -151,8 +154,8 @@ export class Game {
     return true;
   }
 
-  private playerUnits(unitIds: string[]): Unit[] {
-    const player = this.state.players.player;
+  private unitsOf(faction: PlayerId, unitIds: string[]): Unit[] {
+    const player = this.state.players[faction];
     const ids = new Set(unitIds);
     return player.units.filter((unit) => ids.has(unit.id) && unit.state !== "dead");
   }
@@ -173,13 +176,14 @@ export class Game {
         break;
       }
       case "PLACE_BUILDING": {
+        const faction = command.faction ?? "player";
         const placed = this.placeBuilding(
-          "player",
+          faction,
           command.buildingType,
           command.tileX,
           command.tileY,
         );
-        if (placed && !this.canAffordMore(command.buildingType)) {
+        if (faction === "player" && placed && !this.canAffordMore(command.buildingType)) {
           ui.pendingBuild = undefined;
         }
         break;
@@ -193,19 +197,30 @@ export class Game {
       case "SELECT_UNITS": {
         ui.pendingBuild = undefined;
         ui.selectedBuildingId = undefined;
-        ui.selectedUnitIds = this.playerUnits(command.unitIds).map((unit) => unit.id);
+        ui.selectedUnitIds = this.unitsOf("player", command.unitIds).map((unit) => unit.id);
         break;
       }
       case "TRAIN_UNIT": {
-        this.production.enqueue(this.state, "player", command.buildingId, command.unitType);
+        this.production.enqueue(
+          this.state,
+          command.faction ?? "player",
+          command.buildingId,
+          command.unitType,
+        );
         break;
       }
       case "MOVE_UNITS": {
-        this.movement.orderMove(this.playerUnits(command.unitIds), command.x, command.y);
+        this.movement.orderMove(
+          this.unitsOf(command.faction ?? "player", command.unitIds),
+          command.x,
+          command.y,
+        );
         break;
       }
       case "ATTACK_TARGET": {
-        const enemy = this.state.players.enemy;
+        const faction = command.faction ?? "player";
+        const foe: PlayerId = faction === "player" ? "enemy" : "player";
+        const enemy = this.state.players[foe];
         const valid =
           command.targetKind === "unit"
             ? enemy.units.some((unit) => unit.id === command.targetId && unit.state !== "dead")
@@ -214,20 +229,21 @@ export class Game {
               );
         if (!valid) break;
         this.combat.orderAttack(
-          this.playerUnits(command.unitIds),
+          this.unitsOf(faction, command.unitIds),
           command.targetKind,
           command.targetId,
         );
         break;
       }
       case "ASSIGN_WORKERS": {
-        const building = this.state.players.player.buildings.find(
+        const faction = command.faction ?? "player";
+        const building = this.state.players[faction].buildings.find(
           (entry) => entry.id === command.buildingId && entry.state === "complete",
         );
         if (!building) break;
         const slots = freeWorkerSlots(this.state, building);
         if (slots <= 0) break;
-        const villagers = this.playerUnits(command.unitIds)
+        const villagers = this.unitsOf(faction, command.unitIds)
           .filter((unit) => unit.type === "villager")
           .slice(0, slots);
         this.movement.orderAssign(villagers, building);

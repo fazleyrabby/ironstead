@@ -1,12 +1,24 @@
-import type { BuildingType, UnitType } from "./types";
+import type { BuildingType, PlayerId, UnitType } from "./types";
 
 export type Command =
   | { type: "BEGIN_PLACEMENT"; buildingType: BuildingType }
   | { type: "CANCEL_PLACEMENT" }
-  | { type: "PLACE_BUILDING"; buildingType: BuildingType; tileX: number; tileY: number }
+  | {
+      type: "PLACE_BUILDING";
+      buildingType: BuildingType;
+      tileX: number;
+      tileY: number;
+      faction?: PlayerId;
+    }
   | { type: "SELECT_BUILDING"; buildingId?: string }
   | { type: "SELECT_UNITS"; unitIds: string[] }
-  | { type: "TRAIN_UNIT"; buildingId: string; unitType: UnitType }
-  | { type: "MOVE_UNITS"; unitIds: string[]; x: number; y: number }
-  | { type: "ATTACK_TARGET"; unitIds: string[]; targetKind: "unit" | "building"; targetId: string }
-  | { type: "ASSIGN_WORKERS"; unitIds: string[]; buildingId: string };
+  | { type: "TRAIN_UNIT"; buildingId: string; unitType: UnitType; faction?: PlayerId }
+  | { type: "MOVE_UNITS"; unitIds: string[]; x: number; y: number; faction?: PlayerId }
+  | {
+      type: "ATTACK_TARGET";
+      unitIds: string[];
+      targetKind: "unit" | "building";
+      targetId: string;
+      faction?: PlayerId;
+    }
+  | { type: "ASSIGN_WORKERS"; unitIds: string[]; buildingId: string; faction?: PlayerId };

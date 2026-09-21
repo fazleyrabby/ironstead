@@ -113,10 +113,15 @@ export class MovementSystem {
         const a = all[i];
         const b = all[j];
         const minDist = UNITS[a.type].radius + UNITS[b.type].radius;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 0 && dist < minDist) {
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist < 0.01) {
+          dx = 1;
+          dy = 0;
+          dist = 0.01;
+        }
+        if (dist < minDist) {
           const push = (minDist - dist) / 2;
           const nx = dx / dist;
           const ny = dy / dist;
