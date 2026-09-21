@@ -526,29 +526,65 @@ function drawCamp(g: Graphics, building: Building, faction: number): void {
   const lw = line(w);
   shadow(g, w, h);
 
-  g.ellipse(0, h * 0.1, w * 0.46, h * 0.4).fill(STYLE.dirt);
-  g.ellipse(0, h * 0.1, w * 0.46, h * 0.4).stroke({ width: lw, color: OUTLINE, alpha: 0.85 });
+  // rectangular dirt training yard
+  const padW = w * 0.94;
+  const padH = h * 0.9;
+  const top = -padH / 2;
+  g.roundRect(-padW / 2, top, padW, padH, 6).fill(STYLE.dirt);
+  g.roundRect(-padW / 2, top, padW, padH, 6).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
+  g.roundRect(-padW / 2 + 5, top + 5, padW - 10, padH * 0.42, 4).fill({
+    color: STYLE.sand,
+    alpha: 0.32,
+  });
 
-  for (let i = 0; i < 6; i += 1) {
-    const px = -w * 0.42 + i * w * 0.17;
-    g.poly([px - 5, -h * 0.34, px + 5, -h * 0.34, px, -h * 0.44]).fill(STYLE.wood);
-    g.rect(px - 5, -h * 0.34, 10, h * 0.1).fill(STYLE.wood);
+  // timber palisade along the back edge with a rail
+  const posts = 7;
+  for (let i = 0; i < posts; i += 1) {
+    const px = -padW * 0.46 + i * ((padW * 0.92) / (posts - 1));
+    g.rect(px - 3, top - h * 0.16, 6, h * 0.18).fill(STYLE.wood);
+    g.rect(px - 3, top - h * 0.16, 6, h * 0.18).stroke({ width: 1.2, color: OUTLINE, alpha: 0.85 });
+    g.poly([px - 3, top - h * 0.16, px + 3, top - h * 0.16, px, top - h * 0.22]).fill(STYLE.woodLight);
   }
-  g.rect(-w * 0.44, -h * 0.3, w * 0.88, 4).fill(STYLE.woodDark);
+  g.rect(-padW * 0.46, top - h * 0.02, padW * 0.92, 3).fill(STYLE.woodDark);
 
-  tent(g, -w * 0.22, h * 0.05, w * 0.3, h * 0.34, lw);
-  tent(g, w * 0.22, h * 0.12, w * 0.24, h * 0.27, lw);
+  // tents
+  tent(g, -w * 0.2, h * 0.24, w * 0.3, h * 0.32, lw);
+  tent(g, w * 0.22, h * 0.28, w * 0.24, h * 0.26, lw);
 
-  g.circle(w * 0.02, h * 0.3, w * 0.07).fill(STYLE.stoneDark);
-  g.poly([w * 0.02 - 5, h * 0.3 + 3, w * 0.02 + 5, h * 0.3 + 3, w * 0.02, h * 0.3 - 9]).fill(0xf08a2d);
-  g.poly([w * 0.02 - 2.5, h * 0.3 + 3, w * 0.02 + 2.5, h * 0.3 + 3, w * 0.02, h * 0.3 - 4]).fill(0xf6d76a);
+  // campfire: ring of stones + flame
+  const fx = w * 0.02;
+  const fy = h * 0.06;
+  g.ellipse(fx, fy, w * 0.09, h * 0.05).fill(STYLE.stoneDark);
+  g.circle(fx - w * 0.06, fy + h * 0.01, w * 0.022).fill(STYLE.stone);
+  g.circle(fx + w * 0.06, fy + h * 0.015, w * 0.022).fill(STYLE.stone);
+  g.circle(fx, fy - h * 0.04, w * 0.022).fill(STYLE.stone);
+  g.poly([fx - 5, fy + 2, fx + 5, fy + 2, fx, fy - h * 0.12]).fill(0xf08a2d);
+  g.poly([fx - 2.5, fy + 2, fx + 2.5, fy + 2, fx, fy - h * 0.07]).fill(0xf6d76a);
 
-  g.rect(-w * 0.4, -h * 0.05, 3, h * 0.3).fill(STYLE.woodDark);
-  g.rect(-w * 0.4 + 3, -h * 0.05, w * 0.16, 3).fill(STYLE.woodDark);
-  g.circle(-w * 0.4 + 3 + w * 0.08, -h * 0.05 - 4, 4).fill(0xd9b382);
+  // weapon rack: two posts with a rail and leaning spears
+  const rx = -w * 0.4;
+  const ry = h * 0.1;
+  g.rect(rx, ry, 3, h * 0.24).fill(STYLE.woodDark);
+  g.rect(rx + w * 0.16, ry, 3, h * 0.24).fill(STYLE.woodDark);
+  g.rect(rx, ry + h * 0.04, w * 0.16, 3).fill(STYLE.wood);
+  g.rect(rx + w * 0.02, ry - h * 0.08, 2, h * 0.14).fill(STYLE.wood);
+  g.poly([rx + w * 0.02 - 2.5, ry - h * 0.08, rx + w * 0.02 + 2.5, ry - h * 0.08, rx + w * 0.02, ry - h * 0.15]).fill(
+    STYLE.stoneLight,
+  );
+  g.rect(rx + w * 0.11, ry - h * 0.06, 2, h * 0.12).fill(STYLE.wood);
+  g.rect(rx + w * 0.11 - 3, ry - h * 0.09, 6, 2.4).fill(STYLE.stoneDark);
 
-  pennant(g, w * 0.38, -h * 0.32, w * 0.12, faction);
-  g.rect(w * 0.38 - 1.5, -h * 0.32 - 13, 3, h * 0.5).fill(STYLE.woodDark);
+  // training dummy
+  const dx = w * 0.4;
+  const dy = h * 0.34;
+  g.rect(dx - 1.5, dy - h * 0.18, 3, h * 0.2).fill(STYLE.woodDark);
+  g.rect(dx - w * 0.05, dy - h * 0.14, w * 0.1, 3).fill(STYLE.woodDark);
+  g.circle(dx, dy - h * 0.2, w * 0.04).fill(STYLE.sand);
+  g.circle(dx, dy - h * 0.2, w * 0.04).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
+
+  // banner
+  g.rect(w * 0.44 - 1.5, top - h * 0.34, 3, h * 0.34).fill(STYLE.woodDark);
+  pennant(g, w * 0.44, top - h * 0.32, w * 0.13, faction);
 }
 
 function tent(g: Graphics, cx: number, baseY: number, w: number, h: number, lw: number): void {
