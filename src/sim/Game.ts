@@ -1,4 +1,5 @@
 import type { EventBus } from "../core/EventBus";
+import { PONDS } from "../config/map";
 import { GRID_COLS, GRID_ROWS, TILE_SIZE } from "../config/world";
 import type { Command } from "./commands";
 import { canPlace } from "./placement";
@@ -89,6 +90,15 @@ export class Game {
           definition.tilesH,
           true,
         );
+      }
+    }
+    for (const pond of PONDS) {
+      const extent = Math.ceil(pond.radius + 0.5);
+      for (let y = pond.tileY - extent; y <= pond.tileY + extent; y += 1) {
+        for (let x = pond.tileX - extent; x <= pond.tileX + extent; x += 1) {
+          const dist = Math.hypot(x - pond.tileX, y - pond.tileY);
+          if (dist <= pond.radius + 0.4) this.nav.setBlocked(x, y, true);
+        }
       }
     }
   }

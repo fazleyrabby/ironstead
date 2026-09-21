@@ -284,7 +284,12 @@ async function main(): Promise<void> {
 
       ghost.update(game.state.ui, result);
       buildingRenderer.update(game.state, game.state.ui.selectedBuildingId, game.visibility.player);
-      unitRenderer.update(game.state, game.state.ui.selectedUnitIds, game.visibility.player);
+      unitRenderer.update(
+        game.state,
+        game.state.ui.selectedUnitIds,
+        game.visibility.player,
+        performance.now() / 1000,
+      );
       projectileRenderer.update(game.state.projectiles);
       fog.update(game.visibility.player);
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);

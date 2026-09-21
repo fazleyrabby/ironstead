@@ -11,6 +11,17 @@ export interface PlayerLayout {
   buildings: BuildingSpawn[];
 }
 
+export interface Pond {
+  tileX: number;
+  tileY: number;
+  radius: number;
+}
+
+export const PONDS: Pond[] = [
+  { tileX: 17, tileY: 26, radius: 2 },
+  { tileX: 57, tileY: 23, radius: 2 },
+];
+
 export const MAP_LAYOUT: Record<PlayerId, PlayerLayout> = {
   player: {
     baseTile: { x: 38, y: 40 },
