@@ -42,9 +42,13 @@ export class Game {
   private readonly construction: ConstructionSystem;
   private readonly projectiles: ProjectileSystem;
   private readonly repair: RepairSystem;
-  private readonly ai = new AISystem();
+  private readonly aiEnemy = new AISystem("enemy");
+  private readonly aiPlayer = new AISystem("player");
   private readonly queue: Command[] = [];
   private visibilityTimer = 0;
+
+  /** When true the player is also driven by the AI (test / demo mode). */
+  autoPlay = false;
 
   constructor(events: EventBus) {
     this.events = events;
@@ -86,7 +90,8 @@ export class Game {
     this.combat.update(this.state, this.visibility, dt);
     this.projectiles.update(this.state, dt);
     this.movement.update(this.state, dt);
-    this.ai.update(this, dt);
+    this.aiEnemy.update(this, dt);
+    if (this.autoPlay) this.aiPlayer.update(this, dt);
     this.state.time += dt;
 
     this.visibilityTimer += dt;

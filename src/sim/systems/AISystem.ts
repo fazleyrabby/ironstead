@@ -6,7 +6,7 @@ import { def, populationCap, storageCap, unitCount } from "../selectors";
 import { nearestFreeTile } from "../pathfinding";
 import { isTileVisible } from "../visibility";
 import type { Game } from "../Game";
-import type { Building, BuildingType, GameState, ResourceType, Unit } from "../types";
+import type { Building, BuildingType, GameState, PlayerId, ResourceType, Unit } from "../types";
 import type { UnitType } from "../types";
 
 const SCOUT_OFFSETS = [
@@ -24,11 +24,17 @@ export class AISystem {
   private gathering = false;
   private lastScout = 0;
 
+  constructor(private readonly faction: PlayerId = "enemy") {}
+
+  private get foe(): PlayerId {
+    return this.faction === "player" ? "enemy" : "player";
+  }
+
   update(game: Game, dt: number): void {
     const state = game.state;
     if (state.status !== "playing") return;
 
-    const townCenter = state.players.enemy.buildings.find(
+    const townCenter = state.players[this.faction].buildings.find(
       (building) => building.type === "town_center" && building.state !== "destroyed",
     );
     if (!townCenter) return;
@@ -50,7 +56,7 @@ export class AISystem {
 
   private runEconomy(game: Game): void {
     const state = game.state;
-    const enemy = state.players.enemy;
+    const enemy = state.players[this.faction];
     const used = unitCount(enemy);
     const cap = populationCap(enemy);
 
@@ -70,7 +76,7 @@ export class AISystem {
     ) {
       game.execute({
         type: "TRAIN_UNIT",
-        faction: "enemy",
+        faction: this.faction,
         buildingId: townCenter.id,
         unitType: "villager",
       });
@@ -91,14 +97,14 @@ export class AISystem {
     if (camp && camp.queue.length < 3 && used < cap && militaryCount < AI.maxArmy) {
       const pick = this.pickTrainType(enemy);
       if (pick) {
-        game.execute({ type: "TRAIN_UNIT", faction: "enemy", buildingId: camp.id, unitType: pick });
+        game.execute({ type: "TRAIN_UNIT", faction: this.faction, buildingId: camp.id, unitType: pick });
       }
     }
   }
 
   private assignWorkers(game: Game): void {
     const state = game.state;
-    const enemy = state.players.enemy;
+    const enemy = state.players[this.faction];
     const idle = enemy.units.filter(
       (unit) => unit.type === "villager" && unit.state !== "dead" && unit.state === "idle" && !unit.assignedBuildingId,
     );
@@ -139,7 +145,7 @@ export class AISystem {
       if (resource) assigned[resource] += 1;
       game.execute({
         type: "ASSIGN_WORKERS",
-        faction: "enemy",
+        faction: this.faction,
         unitIds: [villager.id],
         buildingId: best.id,
       });
@@ -160,7 +166,7 @@ export class AISystem {
 
   private build(game: Game): void {
     const state = game.state;
-    const enemy = state.players.enemy;
+    const enemy = state.players[this.faction];
     const res = enemy.resources;
     const used = unitCount(enemy);
     const cap = populationCap(enemy);
@@ -201,14 +207,14 @@ export class AISystem {
       this.buildCooldown = 2;
       return false;
     }
-    game.execute({ type: "PLACE_BUILDING", faction: "enemy", buildingType: type, tileX: site.x, tileY: site.y });
+    game.execute({ type: "PLACE_BUILDING", faction: this.faction, buildingType: type, tileX: site.x, tileY: site.y });
     this.buildCooldown = AI.buildCooldown;
     return true;
   }
 
   private findSite(game: Game, type: BuildingType): { x: number; y: number } | undefined {
     const state = game.state;
-    const townCenter = state.players.enemy.buildings.find(
+    const townCenter = state.players[this.faction].buildings.find(
       (building) => building.type === "town_center" && building.state !== "destroyed",
     );
     if (!townCenter) return undefined;
@@ -307,14 +313,14 @@ export class AISystem {
 
   private runMilitary(game: Game, townCenter: Building): void {
     const state = game.state;
-    const enemy = state.players.enemy;
-    const visibility = game.visibility.enemy;
+    const enemy = state.players[this.faction];
+    const visibility = game.visibility[this.faction];
 
     const military = enemy.units.filter(
       (unit) => unit.type !== "villager" && unit.state !== "dead",
     );
 
-    const invaders = state.players.player.units.filter((unit) => {
+    const invaders = state.players[this.foe].units.filter((unit) => {
       if (unit.state === "dead") return false;
       if (Math.hypot(unit.x - townCenter.x, unit.y - townCenter.y) > AI.defenseRadius) return false;
       const tile = worldToTile(unit.x, unit.y);
@@ -335,7 +341,7 @@ export class AISystem {
         if (soldier.targetId !== best.id || soldier.targetKind !== "unit") {
           game.execute({
             type: "ATTACK_TARGET",
-            faction: "enemy",
+            faction: this.faction,
             unitIds: [soldier.id],
             targetKind: "unit",
             targetId: best.id,
@@ -363,7 +369,7 @@ export class AISystem {
         if (movers.length > 0) {
           game.execute({
             type: "MOVE_UNITS",
-            faction: "enemy",
+            faction: this.faction,
             unitIds: movers,
             x: rally.x,
             y: rally.y,
@@ -375,7 +381,7 @@ export class AISystem {
         return;
       }
 
-      const playerTc = state.players.player.buildings.find(
+      const playerTc = state.players[this.foe].buildings.find(
         (building) => building.type === "town_center" && building.state !== "destroyed",
       );
       if (!playerTc) return;
@@ -391,7 +397,7 @@ export class AISystem {
 
       let threat: Unit | undefined;
       let threatDist: number = AI.engageRadius;
-      for (const unit of state.players.player.units) {
+      for (const unit of state.players[this.foe].units) {
         if (unit.state === "dead") continue;
         const dist = Math.hypot(unit.x - cx, unit.y - cy);
         if (dist >= threatDist) continue;
@@ -408,7 +414,7 @@ export class AISystem {
         if (ids.length > 0) {
           game.execute({
             type: "ATTACK_TARGET",
-            faction: "enemy",
+            faction: this.faction,
             unitIds: ids,
             targetKind: "unit",
             targetId: threat.id,
@@ -421,7 +427,7 @@ export class AISystem {
         if (ids.length > 0) {
           game.execute({
             type: "ATTACK_TARGET",
-            faction: "enemy",
+            faction: this.faction,
             unitIds: ids,
             targetKind: "building",
             targetId: playerTc.id,
@@ -440,7 +446,7 @@ export class AISystem {
     if (strays.length > 0) {
       game.execute({
         type: "MOVE_UNITS",
-        faction: "enemy",
+        faction: this.faction,
         unitIds: strays.map((soldier) => soldier.id),
         x: rally.x,
         y: rally.y,
@@ -456,7 +462,7 @@ export class AISystem {
       this.gathering = true;
       game.execute({
         type: "MOVE_UNITS",
-        faction: "enemy",
+        faction: this.faction,
         unitIds: idle.map((soldier) => soldier.id),
         x: rally.x,
         y: rally.y,
@@ -471,10 +477,10 @@ export class AISystem {
       if (scout) {
         this.lastScout = state.time;
         const offset = SCOUT_OFFSETS[Math.floor(state.time / AI.scoutInterval) % SCOUT_OFFSETS.length];
-        const base = MAP_LAYOUT.player.baseTile;
+        const base = MAP_LAYOUT[this.foe].baseTile;
         game.execute({
           type: "MOVE_UNITS",
-          faction: "enemy",
+          faction: this.faction,
           unitIds: [scout.id],
           x: (base.x + offset.x) * TILE_SIZE,
           y: (base.y + offset.y) * TILE_SIZE,

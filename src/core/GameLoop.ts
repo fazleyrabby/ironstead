@@ -3,7 +3,6 @@ export type RenderFn = (frameTime: number, alpha: number) => void;
 
 export class GameLoop {
   private readonly fixedDt: number;
-  private readonly maxSteps: number;
   private readonly update: UpdateFn;
   private readonly render: RenderFn;
 
@@ -13,6 +12,7 @@ export class GameLoop {
   private running = false;
 
   timeScale = 1;
+  maxSteps: number;
 
   constructor(update: UpdateFn, render: RenderFn, updatesPerSecond = 30, maxSteps = 5) {
     this.update = update;

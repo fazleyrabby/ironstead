@@ -308,6 +308,14 @@ async function main(): Promise<void> {
       if (code === "Digit1") loop.timeScale = 1;
       if (code === "Digit2") loop.timeScale = 2;
       if (code === "Digit3") loop.timeScale = 3;
+      if (code === "Digit4") loop.timeScale = 4;
+      if (code === "Digit5") loop.timeScale = 5;
+      if (code === "KeyT" && game.state.status === "playing") {
+        game.autoPlay = !game.autoPlay;
+        loop.timeScale = game.autoPlay ? 5 : 1;
+        loop.maxSteps = game.autoPlay ? 30 : 5;
+        hud.setTestMode(game.autoPlay);
+      }
       if (code === "KeyM") {
         sfx.toggle();
         sfx.play("click");

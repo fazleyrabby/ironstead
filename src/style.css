@@ -650,6 +650,16 @@ body.menu-open #ui {
   image-rendering: pixelated;
 }
 
+.hud-test {
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.hud-test.hidden {
+  display: none;
+}
+
 body.menu-open .minimap {
   display: none;
 }

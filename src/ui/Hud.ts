@@ -25,11 +25,13 @@ export class Hud {
   private readonly clock: HTMLElement;
   private readonly speed: HTMLElement;
   private readonly sound: HTMLElement;
+  private readonly testBadge: HTMLElement;
   private readonly options: HudOptions;
 
   constructor(parent: HTMLElement, options: HudOptions = {}) {
     this.options = options;
     const title = el("div", "hud-title", "BROWSER RTS");
+    this.testBadge = el("div", "hud-pill hud-test hidden", "TEST MODE");
     const resources = el("div", "hud-res");
 
     for (const type of RESOURCE_TYPES) {
@@ -55,7 +57,11 @@ export class Hud {
     this.sound.title = "Toggle sound (M)";
     this.sound.addEventListener("click", () => this.options.onToggleSound?.());
 
-    parent.append(title, el("div", "hud-spacer"), resources, pop, this.clock, this.speed, this.sound);
+    parent.append(title, this.testBadge, el("div", "hud-spacer"), resources, pop, this.clock, this.speed, this.sound);
+  }
+
+  setTestMode(on: boolean): void {
+    this.testBadge.classList.toggle("hidden", !on);
   }
 
   update(state: GameState, timeScale = 1): void {
