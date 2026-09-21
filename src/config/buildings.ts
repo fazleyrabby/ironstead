@@ -1,4 +1,4 @@
-import type { BuildingType, ResourceStore, ResourceType } from "../sim/types";
+import type { BuildingType, ResourceStore, ResourceType, UnitType } from "../sim/types";
 
 export interface BuildingProduction {
   resource: ResourceType;
@@ -18,6 +18,8 @@ export interface BuildingDefinition {
   population: number;
   storage: number;
   production?: BuildingProduction;
+  produces?: UnitType[];
+  maxWorkers?: number;
   buildable: boolean;
   colors: { body: number; roof: number; accent: number };
 }
@@ -34,6 +36,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     buildTime: 0,
     population: 5,
     storage: 500,
+    produces: ["villager"],
     buildable: false,
     colors: { body: 0xe8d8b0, roof: 0xb5533f, accent: 0xf1e6cf },
   },
@@ -63,6 +66,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     production: { resource: "food", baseRate: 3, perWorker: 7 },
+    maxWorkers: 3,
     buildable: true,
     colors: { body: 0xc9a227, roof: 0x7a8f3a, accent: 0xe0c45a },
   },
@@ -91,6 +95,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     buildTime: 12,
     population: 0,
     storage: 0,
+    produces: ["swordsman", "spearman", "crossbowman", "horse_rider"],
     buildable: true,
     colors: { body: 0x8f9aa8, roof: 0x4b5563, accent: 0xaeb8c4 },
   },
@@ -134,6 +139,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     production: { resource: "wood", baseRate: 2, perWorker: 6 },
+    maxWorkers: 3,
     buildable: false,
     colors: { body: 0x2f5d34, roof: 0x3f7a44, accent: 0x538f59 },
   },
@@ -149,12 +155,13 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     production: { resource: "gold", baseRate: 1.5, perWorker: 4 },
+    maxWorkers: 3,
     buildable: false,
     colors: { body: 0x8b8f9a, roof: 0x6f737d, accent: 0xf2c14e },
   },
 };
 
-export const BUILDABLE_TYPES: readonly BuildingType[] = ["house", "farm", "storage"];
+export const BUILDABLE_TYPES: readonly BuildingType[] = ["house", "farm", "storage", "army_camp"];
 
 export const BUILDING_ICONS: Record<BuildingType, string> = {
   town_center: "\u{1F3F0}",

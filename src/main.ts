@@ -7,15 +7,18 @@ import { InputManager } from "./input/InputManager";
 import { BuildingRenderer } from "./render/BuildingRenderer";
 import { Camera } from "./render/Camera";
 import { PlacementGhost } from "./render/PlacementGhost";
+import { SelectionBox } from "./render/SelectionBox";
+import { UnitRenderer } from "./render/UnitRenderer";
 import { buildWorldScene } from "./render/WorldScene";
 import { Game } from "./sim/Game";
-import { buildingAtTile, def } from "./sim/selectors";
+import { buildingAtTile, def, unitDef } from "./sim/selectors";
 import { canPlace } from "./sim/placement";
 import type { PlacementResult } from "./sim/placement";
+import type { BuildingType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
 
-function placementOrigin(type: Parameters<typeof def>[0], tile: { x: number; y: number }) {
+function placementOrigin(type: BuildingType, tile: { x: number; y: number }) {
   const definition = def(type);
   return {
     x: tile.x - Math.floor((definition.tilesW - 1) / 2),
@@ -43,12 +46,14 @@ async function main(): Promise<void> {
   mount.appendChild(app.canvas);
 
   const world = new Container();
-  app.stage.addChild(world);
+  const screenLayer = new Container();
+  app.stage.addChild(world, screenLayer);
   buildWorldScene(world);
 
   const buildingLayer = new Container();
+  const unitLayer = new Container();
   const ghostLayer = new Container();
-  world.addChild(buildingLayer, ghostLayer);
+  world.addChild(buildingLayer, unitLayer, ghostLayer);
 
   const events = new EventBus();
   const game = new Game(events);
@@ -56,10 +61,13 @@ async function main(): Promise<void> {
   camera.resize(app.screen.width, app.screen.height);
 
   const baseTile = MAP_LAYOUT.player.baseTile;
-  camera.centerOn(baseTile.x * TILE_SIZE, baseTile.y * TILE_SIZE, 1.05);
+  const baseCenter = { x: baseTile.x * TILE_SIZE, y: baseTile.y * TILE_SIZE };
+  camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
 
   const buildingRenderer = new BuildingRenderer(buildingLayer);
+  const unitRenderer = new UnitRenderer(unitLayer);
   const ghost = new PlacementGhost(ghostLayer);
+  const selectionBox = new SelectionBox(screenLayer);
   const hud = new Hud(hudTop);
   const commandPanel = new CommandPanel(hudBottom, (command) => game.execute(command));
 
@@ -70,12 +78,27 @@ async function main(): Promise<void> {
     return pending ? placementOrigin(pending, tile) : tile;
   }
 
+  function unitAtPoint(worldX: number, worldY: number) {
+    const player = game.state.players.player;
+    let best: (typeof player.units)[number] | undefined;
+    let bestScore = 18;
+    for (const unit of player.units) {
+      if (unit.state === "dead") continue;
+      const score = Math.hypot(unit.x - worldX, unit.y - worldY) - unitDef(unit.type).radius;
+      if (score < bestScore) {
+        bestScore = score;
+        best = unit;
+      }
+    }
+    return best;
+  }
+
   function handlePrimary(screenX: number, screenY: number): void {
     const worldPoint = camera.screenToWorld(screenX, screenY);
-    const tile = worldToTile(worldPoint.x, worldPoint.y);
     const pending = game.state.ui.pendingBuild;
 
     if (pending) {
+      const tile = worldToTile(worldPoint.x, worldPoint.y);
       const origin = placementOrigin(pending, tile);
       game.execute({
         type: "PLACE_BUILDING",
@@ -86,28 +109,85 @@ async function main(): Promise<void> {
       return;
     }
 
-    const hit =
+    const hitUnit = unitAtPoint(worldPoint.x, worldPoint.y);
+    if (hitUnit) {
+      game.execute({ type: "SELECT_UNITS", unitIds: [hitUnit.id] });
+      return;
+    }
+
+    const tile = worldToTile(worldPoint.x, worldPoint.y);
+    const hitBuilding =
       buildingAtTile(game.state.players.player, tile.x, tile.y) ??
       buildingAtTile(game.state.players.enemy, tile.x, tile.y);
-    game.execute({ type: "SELECT_BUILDING", buildingId: hit?.id });
+    if (hitBuilding) {
+      game.execute({ type: "SELECT_BUILDING", buildingId: hitBuilding.id });
+      return;
+    }
+
+    game.execute({ type: "SELECT_UNITS", unitIds: [] });
+    game.execute({ type: "SELECT_BUILDING" });
+  }
+
+  function handleBox(x0: number, y0: number, x1: number, y1: number): void {
+    const a = camera.screenToWorld(x0, y0);
+    const b = camera.screenToWorld(x1, y1);
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    const minY = Math.min(a.y, b.y);
+    const maxY = Math.max(a.y, b.y);
+
+    const ids = game.state.players.player.units
+      .filter(
+        (unit) =>
+          unit.state !== "dead" && unit.x >= minX && unit.x <= maxX && unit.y >= minY && unit.y <= maxY,
+      )
+      .map((unit) => unit.id);
+
+    game.execute({ type: "SELECT_UNITS", unitIds: ids });
+    if (ids.length === 0) {
+      game.execute({ type: "SELECT_BUILDING" });
+    }
+  }
+
+  function handleSecondary(screenX: number, screenY: number): void {
+    if (game.state.ui.pendingBuild) {
+      game.execute({ type: "CANCEL_PLACEMENT" });
+      return;
+    }
+
+    const selectedIds = game.state.ui.selectedUnitIds;
+    if (selectedIds.length === 0) return;
+
+    const worldPoint = camera.screenToWorld(screenX, screenY);
+    const tile = worldToTile(worldPoint.x, worldPoint.y);
+    const target = buildingAtTile(game.state.players.player, tile.x, tile.y);
+
+    if (target && def(target.type).maxWorkers) {
+      const villagers = selectedIds.filter((id) => {
+        const unit = game.state.players.player.units.find((entry) => entry.id === id);
+        return unit && unit.type === "villager" && unit.state !== "dead";
+      });
+      if (villagers.length > 0) {
+        game.execute({ type: "ASSIGN_WORKERS", unitIds: villagers, buildingId: target.id });
+        return;
+      }
+    }
+
+    game.execute({ type: "MOVE_UNITS", unitIds: selectedIds, x: worldPoint.x, y: worldPoint.y });
   }
 
   const input = new InputManager(app.canvas, camera, {
     onPrimaryClick: handlePrimary,
-    onSecondaryClick: () => {
-      if (game.state.ui.pendingBuild) {
-        game.execute({ type: "CANCEL_PLACEMENT" });
-      } else {
-        game.execute({ type: "SELECT_BUILDING" });
-      }
-    },
+    onSecondaryClick: handleSecondary,
+    onBoxSelect: handleBox,
     onKeyDown: (code) => {
       if (code === "Escape") {
         game.execute({ type: "CANCEL_PLACEMENT" });
         game.execute({ type: "SELECT_BUILDING" });
+        game.execute({ type: "SELECT_UNITS", unitIds: [] });
       }
       if (code === "KeyC") {
-        camera.centerOn(baseTile.x * TILE_SIZE, baseTile.y * TILE_SIZE, 1.05);
+        camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
       }
     },
   });
@@ -133,6 +213,8 @@ async function main(): Promise<void> {
 
       ghost.update(game.state.ui, result);
       buildingRenderer.update(game.state, game.state.ui.selectedBuildingId);
+      unitRenderer.update(game.state, game.state.ui.selectedUnitIds);
+      selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state);
       commandPanel.update(game.state);
       app.renderer.render(app.stage);

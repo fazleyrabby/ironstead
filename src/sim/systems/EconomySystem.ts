@@ -1,4 +1,4 @@
-import { productionRate, productionResource, storageCap } from "../selectors";
+import { assignedWorkers, productionRate, productionResource, storageCap } from "../selectors";
 import type { GameState } from "../types";
 
 export class EconomySystem {
@@ -8,7 +8,8 @@ export class EconomySystem {
       for (const building of player.buildings) {
         const resource = productionResource(building);
         if (!resource) continue;
-        const rate = productionRate(building);
+        const active = assignedWorkers(state, building).length;
+        const rate = productionRate(building, active);
         if (rate <= 0) continue;
         player.resources[resource] = Math.min(cap, player.resources[resource] + rate * dt);
       }

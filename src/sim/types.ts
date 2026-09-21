@@ -21,6 +21,11 @@ export type BuildingType =
 
 export type BuildingState = "constructing" | "complete" | "destroyed";
 
+export interface TrainOrder {
+  unitType: UnitType;
+  progress: number;
+}
+
 export interface Building {
   id: string;
   type: BuildingType;
@@ -36,19 +41,38 @@ export interface Building {
   state: BuildingState;
   buildProgress: number;
   workerCount: number;
+  queue: TrainOrder[];
+}
+
+export type UnitType = "villager" | "swordsman" | "spearman" | "crossbowman" | "horse_rider";
+
+export type UnitState = "idle" | "moving" | "gathering" | "attacking" | "dead";
+
+export interface Unit {
+  id: string;
+  type: UnitType;
+  owner: PlayerId;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  state: UnitState;
+  path: Array<{ x: number; y: number }>;
+  assignedBuildingId?: string;
 }
 
 export interface PlayerState {
   id: PlayerId;
   resources: ResourceStore;
   buildings: Building[];
-  populationUsed: number;
+  units: Unit[];
 }
 
 export interface UiState {
   pendingBuild?: BuildingType;
   hoverTile?: { x: number; y: number };
   selectedBuildingId?: string;
+  selectedUnitIds: string[];
 }
 
 export type GameStatus = "playing" | "victory" | "defeat";

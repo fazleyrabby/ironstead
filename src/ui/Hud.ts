@@ -1,5 +1,5 @@
 import { RESOURCE_ICONS, RESOURCE_LABELS, RESOURCE_TYPES } from "../config/resources";
-import { populationCap } from "../sim/selectors";
+import { populationCap, unitCount } from "../sim/selectors";
 import type { GameState, ResourceType } from "../sim/types";
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -55,7 +55,7 @@ export class Hud {
       if (node.textContent !== text) node.textContent = text;
     }
 
-    const used = player.populationUsed.toString();
+    const used = unitCount(player).toString();
     if (this.popValue.textContent !== used) this.popValue.textContent = used;
 
     const cap = `/ ${populationCap(player)}`;

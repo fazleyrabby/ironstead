@@ -3,11 +3,21 @@ import { Camera } from "../render/Camera";
 export interface InputCallbacks {
   onPrimaryClick?: (screenX: number, screenY: number) => void;
   onSecondaryClick?: (screenX: number, screenY: number) => void;
+  onBoxSelect?: (x0: number, y0: number, x1: number, y1: number) => void;
   onKeyDown?: (code: string) => void;
+}
+
+export interface DragBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  active: boolean;
 }
 
 export class InputManager {
   readonly pointer = { x: 0, y: 0, inside: false };
+  readonly dragBox: DragBox = { x0: 0, y0: 0, x1: 0, y1: 0, active: false };
 
   private readonly canvas: HTMLCanvasElement;
   private readonly camera: Camera;
@@ -80,6 +90,14 @@ export class InputManager {
       this.downX = event.clientX;
       this.downY = event.clientY;
       this.moved = false;
+      if (event.button === 0) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.dragBox.x0 = event.clientX - rect.left;
+        this.dragBox.y0 = event.clientY - rect.top;
+        this.dragBox.x1 = this.dragBox.x0;
+        this.dragBox.y1 = this.dragBox.y0;
+        this.dragBox.active = false;
+      }
     }
   };
 
@@ -98,6 +116,12 @@ export class InputManager {
       Math.abs(event.clientX - this.downX) + Math.abs(event.clientY - this.downY) > 6
     ) {
       this.moved = true;
+      if (this.downButton === 0) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.dragBox.x1 = event.clientX - rect.left;
+        this.dragBox.y1 = event.clientY - rect.top;
+        this.dragBox.active = true;
+      }
     }
   };
 
@@ -112,9 +136,17 @@ export class InputManager {
     if (this.downButton === -1 || event.button !== this.downButton) return;
 
     const wasMoved = this.moved;
+    const wasBox = this.dragBox.active && event.button === 0;
+    const box = { ...this.dragBox };
     this.downButton = -1;
+    this.dragBox.active = false;
 
-    if (wasMoved) return;
+    if (wasMoved) {
+      if (wasBox) {
+        this.callbacks.onBoxSelect?.(box.x0, box.y0, box.x1, box.y1);
+      }
+      return;
+    }
 
     const rect = this.canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;

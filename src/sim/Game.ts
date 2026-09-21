@@ -1,18 +1,25 @@
 import type { EventBus } from "../core/EventBus";
-import { GRID_COLS, GRID_ROWS } from "../config/world";
+import { GRID_COLS, GRID_ROWS, TILE_SIZE } from "../config/world";
 import type { Command } from "./commands";
 import { canPlace } from "./placement";
-import { def, spendCost } from "./selectors";
-import { createInitialState, spawnBuilding } from "./GameState";
+import { def, freeWorkerSlots, spendCost } from "./selectors";
+import { createInitialState, spawnBuilding, spawnUnit } from "./GameState";
 import { NavGrid } from "./navgrid";
+import { nearestFreeTile, tileToWorldCenter } from "./pathfinding";
 import { ConstructionSystem } from "./systems/ConstructionSystem";
 import { EconomySystem } from "./systems/EconomySystem";
-import type { Building, BuildingType, GameState, PlayerId } from "./types";
+import { MovementSystem } from "./systems/MovementSystem";
+import { ProductionSystem } from "./systems/ProductionSystem";
+import type { Building, BuildingType, GameState, PlayerId, Unit } from "./types";
+
+const STARTING_VILLAGERS = 4;
 
 export class Game {
   readonly state: GameState;
   readonly nav: NavGrid;
   readonly events: EventBus;
+  readonly movement: MovementSystem;
+  readonly production: ProductionSystem;
 
   private readonly economy = new EconomySystem();
   private readonly construction: ConstructionSystem;
@@ -23,7 +30,10 @@ export class Game {
     this.state = createInitialState();
     this.nav = new NavGrid(GRID_COLS, GRID_ROWS);
     this.construction = new ConstructionSystem(events);
+    this.movement = new MovementSystem(this.nav);
+    this.production = new ProductionSystem(events, this.nav);
     this.rebuildNav();
+    this.spawnStartingUnits();
   }
 
   execute(command: Command): void {
@@ -38,6 +48,8 @@ export class Game {
 
     this.economy.update(this.state, dt);
     this.construction.update(this.state, dt);
+    this.production.update(this.state, dt);
+    this.movement.update(this.state, dt);
     this.state.time += dt;
   }
 
@@ -53,6 +65,30 @@ export class Game {
           definition.tilesH,
           true,
         );
+      }
+    }
+  }
+
+  private spawnStartingUnits(): void {
+    for (const id of ["player", "enemy"] as const) {
+      const townCenter = this.state.players[id].buildings.find(
+        (building) => building.type === "town_center",
+      );
+      if (!townCenter) continue;
+
+      for (let i = 0; i < STARTING_VILLAGERS; i += 1) {
+        const angle = (i / STARTING_VILLAGERS) * Math.PI * 2;
+        const tileX = Math.floor(
+          (townCenter.x + Math.cos(angle) * (townCenter.width / 2 + 48)) / TILE_SIZE,
+        );
+        const tileY = Math.floor(
+          (townCenter.y + Math.sin(angle) * (townCenter.height / 2 + 48)) / TILE_SIZE,
+        );
+        const free = nearestFreeTile(this.nav, tileX, tileY, 12);
+        const point = free
+          ? tileToWorldCenter(free.x, free.y)
+          : { x: townCenter.x, y: townCenter.y };
+        this.state.players[id].units.push(spawnUnit(this.state, id, "villager", point.x, point.y));
       }
     }
   }
@@ -81,6 +117,12 @@ export class Game {
     return true;
   }
 
+  private playerUnits(unitIds: string[]): Unit[] {
+    const player = this.state.players.player;
+    const ids = new Set(unitIds);
+    return player.units.filter((unit) => ids.has(unit.id) && unit.state !== "dead");
+  }
+
   private apply(command: Command): void {
     const ui = this.state.ui;
 
@@ -88,6 +130,7 @@ export class Game {
       case "BEGIN_PLACEMENT": {
         ui.pendingBuild = command.buildingType;
         ui.selectedBuildingId = undefined;
+        ui.selectedUnitIds = [];
         break;
       }
       case "CANCEL_PLACEMENT": {
@@ -109,7 +152,35 @@ export class Game {
       }
       case "SELECT_BUILDING": {
         ui.pendingBuild = undefined;
+        ui.selectedUnitIds = [];
         ui.selectedBuildingId = command.buildingId;
+        break;
+      }
+      case "SELECT_UNITS": {
+        ui.pendingBuild = undefined;
+        ui.selectedBuildingId = undefined;
+        ui.selectedUnitIds = this.playerUnits(command.unitIds).map((unit) => unit.id);
+        break;
+      }
+      case "TRAIN_UNIT": {
+        this.production.enqueue(this.state, "player", command.buildingId, command.unitType);
+        break;
+      }
+      case "MOVE_UNITS": {
+        this.movement.orderMove(this.playerUnits(command.unitIds), command.x, command.y);
+        break;
+      }
+      case "ASSIGN_WORKERS": {
+        const building = this.state.players.player.buildings.find(
+          (entry) => entry.id === command.buildingId && entry.state === "complete",
+        );
+        if (!building) break;
+        const slots = freeWorkerSlots(this.state, building);
+        if (slots <= 0) break;
+        const villagers = this.playerUnits(command.unitIds)
+          .filter((unit) => unit.type === "villager")
+          .slice(0, slots);
+        this.movement.orderAssign(villagers, building);
         break;
       }
     }
@@ -131,5 +202,12 @@ export function findBuilding(state: GameState, id: string | undefined): Building
   return (
     state.players.player.buildings.find((building) => building.id === id) ??
     state.players.enemy.buildings.find((building) => building.id === id)
+  );
+}
+
+export function findUnit(state: GameState, id: string): Unit | undefined {
+  return (
+    state.players.player.units.find((unit) => unit.id === id) ??
+    state.players.enemy.units.find((unit) => unit.id === id)
   );
 }

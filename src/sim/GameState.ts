@@ -2,7 +2,16 @@ import { BUILDINGS } from "../config/buildings";
 import { MAP_LAYOUT } from "../config/map";
 import { STARTING_RESOURCES } from "../config/resources";
 import { centerOfTileRect, def, footprintWorld } from "./selectors";
-import type { Building, BuildingType, GameState, PlayerId, PlayerState } from "./types";
+import { unitDef } from "./selectors";
+import type {
+  Building,
+  BuildingType,
+  GameState,
+  PlayerId,
+  PlayerState,
+  Unit,
+  UnitType,
+} from "./types";
 
 export function spawnBuilding(
   state: GameState,
@@ -31,6 +40,29 @@ export function spawnBuilding(
     state: complete ? "complete" : "constructing",
     buildProgress: complete ? 1 : 0,
     workerCount: 0,
+    queue: [],
+  };
+}
+
+export function spawnUnit(
+  state: GameState,
+  owner: PlayerId,
+  type: UnitType,
+  x: number,
+  y: number,
+): Unit {
+  const definition = unitDef(type);
+  return {
+    id: `u${state.nextId++}`,
+    type,
+    owner,
+    x,
+    y,
+    hp: definition.hp,
+    maxHp: definition.hp,
+    state: "idle",
+    path: [],
+    assignedBuildingId: undefined,
   };
 }
 
@@ -39,7 +71,7 @@ function createPlayer(id: PlayerId): PlayerState {
     id,
     resources: { ...STARTING_RESOURCES },
     buildings: [],
-    populationUsed: 0,
+    units: [],
   };
 }
 
@@ -51,7 +83,7 @@ export function createInitialState(): GameState {
       player: createPlayer("player"),
       enemy: createPlayer("enemy"),
     },
-    ui: {},
+    ui: { selectedUnitIds: [] },
     nextId: 1,
   };
 
