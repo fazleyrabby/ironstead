@@ -19,7 +19,7 @@ import { buildingAtTile, def, unitDef } from "./sim/selectors";
 import { canPlace } from "./sim/placement";
 import type { PlacementResult } from "./sim/placement";
 import { tileToWorldCenter } from "./sim/pathfinding";
-import { isTileVisible } from "./sim/visibility";
+import { isTileExplored, isTileVisible } from "./sim/visibility";
 import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
@@ -154,12 +154,14 @@ async function main(): Promise<void> {
     return best;
   }
 
-  function visibleEnemyBuildingAt(tileX: number, tileY: number) {
+  function enemyBuildingAt(tileX: number, tileY: number) {
     const hit = buildingAtTile(game.state.players.enemy, tileX, tileY);
     if (!hit) return undefined;
     const center = worldToTile(hit.x, hit.y);
-    if (!isTileVisible(game.visibility.player, center.x, center.y)) return undefined;
-    return hit;
+    const seen =
+      isTileVisible(game.visibility.player, center.x, center.y) ||
+      isTileExplored(game.visibility.player, center.x, center.y);
+    return seen ? hit : undefined;
   }
 
   const DOUBLE_CLICK_MS = 300;
@@ -270,7 +272,7 @@ async function main(): Promise<void> {
     }
 
     const tile = worldToTile(worldPoint.x, worldPoint.y);
-    const enemyBuilding = visibleEnemyBuildingAt(tile.x, tile.y);
+    const enemyBuilding = enemyBuildingAt(tile.x, tile.y);
     if (enemyBuilding) {
       game.execute({
         type: "ATTACK_TARGET",
