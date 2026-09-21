@@ -36,7 +36,8 @@ export class CombatSystem {
       unit.targetKind = targetKind;
       unit.targetId = targetId;
       unit.attackTimer = 0;
-      unit.repathTimer = 0;
+      // stagger first repath so a whole group doesn't run A* on the same tick
+      unit.repathTimer = Math.random() * REPATH_INTERVAL;
       unit.path = [];
       unit.state = "moving";
     }
@@ -108,8 +109,10 @@ export class CombatSystem {
         } else {
           unit.state = "moving";
           unit.repathTimer -= dt;
-          if (unit.repathTimer <= 0 || unit.path.length === 0) {
-            unit.repathTimer = REPATH_INTERVAL;
+          // Repath on a timer only. Do NOT retry every tick when the path is
+          // empty, or stuck/blocked units run a full-grid A* 30x/s.
+          if (unit.repathTimer <= 0) {
+            unit.repathTimer = REPATH_INTERVAL * (0.85 + Math.random() * 0.3);
             unit.path = this.pathToTarget(unit, target);
           }
         }
