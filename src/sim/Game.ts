@@ -61,7 +61,7 @@ export class Game {
     };
     this.construction = new ConstructionSystem(events);
     this.movement = new MovementSystem(this.nav);
-    this.production = new ProductionSystem(events, this.nav);
+    this.production = new ProductionSystem(events, this.nav, this.movement);
     this.combat = new CombatSystem(events, this.nav);
     this.hero = new HeroSystem(events);
     this.repair = new RepairSystem(events);
@@ -332,11 +332,36 @@ export class Game {
         break;
       }
       case "MOVE_UNITS": {
-        this.movement.orderMove(
-          this.unitsOf(command.faction ?? "player", command.unitIds),
-          command.x,
-          command.y,
+        const units = this.unitsOf(command.faction ?? "player", command.unitIds);
+        for (const unit of units) {
+          unit.attackMoveX = undefined;
+          unit.attackMoveY = undefined;
+        }
+        this.movement.orderMove(units, command.x, command.y);
+        break;
+      }
+      case "ATTACK_MOVE": {
+        const units = this.unitsOf(command.faction ?? "player", command.unitIds);
+        this.movement.orderMove(units, command.x, command.y);
+        for (const unit of units) {
+          unit.attackMoveX = command.x;
+          unit.attackMoveY = command.y;
+        }
+        break;
+      }
+      case "STOP": {
+        this.movement.stop(this.unitsOf(command.faction ?? "player", command.unitIds));
+        break;
+      }
+      case "SET_RALLY": {
+        const faction = command.faction ?? "player";
+        const building = this.state.players[faction].buildings.find(
+          (entry) => entry.id === command.buildingId && entry.state !== "destroyed",
         );
+        if (!building) break;
+        building.rallyX = command.x;
+        building.rallyY = command.y;
+        this.events.emit("rally:set", building.id);
         break;
       }
       case "ATTACK_TARGET": {
@@ -350,11 +375,12 @@ export class Game {
                 (building) => building.id === command.targetId && building.state !== "destroyed",
               );
         if (!valid) break;
-        this.combat.orderAttack(
-          this.unitsOf(faction, command.unitIds),
-          command.targetKind,
-          command.targetId,
-        );
+        const targets = this.unitsOf(faction, command.unitIds);
+        for (const unit of targets) {
+          unit.attackMoveX = undefined;
+          unit.attackMoveY = undefined;
+        }
+        this.combat.orderAttack(targets, command.targetKind, command.targetId);
         break;
       }
       case "ASSIGN_WORKERS": {

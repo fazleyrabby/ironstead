@@ -33,6 +33,8 @@ export class CombatSystem {
     for (const unit of units) {
       unit.assignedBuildingId = undefined;
       unit.repairBuildingId = undefined;
+      unit.attackMoveX = undefined;
+      unit.attackMoveY = undefined;
       unit.targetKind = targetKind;
       unit.targetId = targetId;
       unit.attackTimer = 0;
@@ -72,7 +74,11 @@ export class CombatSystem {
           if (unit.state === "attacking" || unit.state === "moving") unit.state = "idle";
         }
 
-        if (!unit.targetId && unitDef(unit.type).aggressive && unit.state === "idle") {
+        if (
+          !unit.targetId &&
+          unitDef(unit.type).aggressive &&
+          (unit.state === "idle" || unit.attackMoveX !== undefined)
+        ) {
           const enemy = this.nearestEnemyUnit(
             state,
             foe,

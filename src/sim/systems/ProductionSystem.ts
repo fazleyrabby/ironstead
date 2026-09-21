@@ -3,16 +3,19 @@ import type { EventBus } from "../../core/EventBus";
 import { canAfford, def, populationCap, spendCost, unitCount, unitDef } from "../selectors";
 import { nearestFreeTile, tileToWorldCenter } from "../pathfinding";
 import { spawnUnit } from "../GameState";
+import type { MovementSystem } from "./MovementSystem";
 import type { NavGrid } from "../navgrid";
 import type { GameState, PlayerId, UnitType } from "../types";
 
 export class ProductionSystem {
   private readonly events: EventBus;
   private readonly nav: NavGrid;
+  private readonly movement: MovementSystem;
 
-  constructor(events: EventBus, nav: NavGrid) {
+  constructor(events: EventBus, nav: NavGrid, movement: MovementSystem) {
     this.events = events;
     this.nav = nav;
+    this.movement = movement;
   }
 
   enqueue(state: GameState, playerId: PlayerId, buildingId: string, unitType: UnitType): boolean {
@@ -83,6 +86,9 @@ export class ProductionSystem {
 
     const unit = spawnUnit(state, playerId, unitType, px, py);
     player.units.push(unit);
+    if (building.rallyX !== undefined && building.rallyY !== undefined) {
+      this.movement.orderMove([unit], building.rallyX, building.rallyY);
+    }
     this.events.emit("unit:created", unit);
     return true;
   }

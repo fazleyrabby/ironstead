@@ -169,6 +169,7 @@ async function main(): Promise<void> {
   let lastClickAt = 0;
   let lastClickType: UnitType | undefined;
   const controlGroups = new Map<string, string[]>();
+  let attackMovePending = false;
 
   function handlePrimary(screenX: number, screenY: number): void {
     const worldPoint = camera.screenToWorld(screenX, screenY);
@@ -183,6 +184,15 @@ async function main(): Promise<void> {
         tileX: origin.x,
         tileY: origin.y,
       });
+      return;
+    }
+
+    if (attackMovePending) {
+      attackMovePending = false;
+      const ids = game.state.ui.selectedUnitIds;
+      if (ids.length > 0) {
+        game.execute({ type: "ATTACK_MOVE", unitIds: ids, x: worldPoint.x, y: worldPoint.y });
+      }
       return;
     }
 
@@ -261,7 +271,19 @@ async function main(): Promise<void> {
 
   function orderAtWorld(worldPoint: { x: number; y: number }): void {
     const selectedIds = game.state.ui.selectedUnitIds;
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0) {
+      // no units selected: right-click sets a rally point on a selected building
+      const buildingId = game.state.ui.selectedBuildingId;
+      if (buildingId) {
+        const building = game.state.players.player.buildings.find(
+          (entry) => entry.id === buildingId && entry.state !== "destroyed",
+        );
+        if (building) {
+          game.execute({ type: "SET_RALLY", buildingId, x: worldPoint.x, y: worldPoint.y });
+        }
+      }
+      return;
+    }
 
     const enemyUnit = enemyUnitAtPoint(worldPoint.x, worldPoint.y);
     if (enemyUnit) {
@@ -316,6 +338,7 @@ async function main(): Promise<void> {
       if (!started) return;
       const mod = event.ctrlKey || event.metaKey;
       if (code === "Escape") {
+        attackMovePending = false;
         if (game.state.ui.pendingBuild) {
           game.execute({ type: "CANCEL_PLACEMENT" });
         } else if (
@@ -330,6 +353,12 @@ async function main(): Promise<void> {
       }
       if (code === "KeyB" && game.state.status === "playing") {
         game.execute({ type: "TOGGLE_BUILD" });
+      }
+      if (code === "KeyA" && game.state.ui.selectedUnitIds.length > 0) {
+        attackMovePending = true;
+      }
+      if (code === "KeyS" && game.state.ui.selectedUnitIds.length > 0) {
+        game.execute({ type: "STOP", unitIds: game.state.ui.selectedUnitIds });
       }
       if (code === "KeyC") {
         camera.centerOn(baseCenter.x, baseCenter.y, 1.05);

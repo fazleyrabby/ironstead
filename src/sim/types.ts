@@ -44,6 +44,8 @@ export interface Building {
   workerCount: number;
   queue: TrainOrder[];
   cooldown: number;
+  rallyX?: number;
+  rallyY?: number;
 }
 
 export type UnitType =
@@ -70,6 +72,8 @@ export interface Unit {
   repairBuildingId?: string;
   targetKind?: "unit" | "building";
   targetId?: string;
+  attackMoveX?: number;
+  attackMoveY?: number;
   attackTimer: number;
   repathTimer: number;
   heroLevel?: number;

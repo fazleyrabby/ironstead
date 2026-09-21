@@ -14,6 +14,17 @@ export class MovementSystem {
     this.nav = nav;
   }
 
+  stop(units: Unit[]): void {
+    for (const unit of units) {
+      unit.attackMoveX = undefined;
+      unit.attackMoveY = undefined;
+      unit.targetId = undefined;
+      unit.targetKind = undefined;
+      unit.path = [];
+      if (unit.state === "moving" || unit.state === "attacking") unit.state = "idle";
+    }
+  }
+
   orderMove(units: Unit[], destX: number, destY: number): void {    const count = units.length;
     if (count === 0) return;
     const cols = Math.ceil(Math.sqrt(count));
@@ -84,6 +95,21 @@ export class MovementSystem {
   update(state: GameState, dt: number): void {
     for (const id of ["player", "enemy"] as const) {
       for (const unit of state.players[id].units) {
+        if (unit.state === "dead") continue;
+
+        // attack-move: keep heading to the destination, resume after fights
+        if (unit.attackMoveX !== undefined && unit.attackMoveY !== undefined) {
+          const adx = unit.attackMoveX - unit.x;
+          const ady = unit.attackMoveY - unit.y;
+          if (Math.hypot(adx, ady) < TILE_SIZE * 0.6) {
+            unit.attackMoveX = undefined;
+            unit.attackMoveY = undefined;
+            if (unit.state === "moving") unit.state = "idle";
+          } else if (!unit.targetId && unit.state !== "moving") {
+            this.sendUnit(unit, unit.attackMoveX, unit.attackMoveY);
+          }
+        }
+
         if (unit.state !== "moving") continue;
         if (unit.path.length === 0) {
           unit.state = unit.repairBuildingId

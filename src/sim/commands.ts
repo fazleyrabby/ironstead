@@ -17,6 +17,9 @@ export type Command =
   | { type: "SELECT_UNITS"; unitIds: string[] }
   | { type: "TRAIN_UNIT"; buildingId: string; unitType: UnitType; faction?: PlayerId }
   | { type: "MOVE_UNITS"; unitIds: string[]; x: number; y: number; faction?: PlayerId }
+  | { type: "ATTACK_MOVE"; unitIds: string[]; x: number; y: number; faction?: PlayerId }
+  | { type: "STOP"; unitIds: string[]; faction?: PlayerId }
+  | { type: "SET_RALLY"; buildingId: string; x: number; y: number; faction?: PlayerId }
   | {
       type: "ATTACK_TARGET";
       unitIds: string[];
