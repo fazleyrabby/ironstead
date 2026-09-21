@@ -619,23 +619,23 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
 
   // rider (positioned once; only the torso bob holder moves)
   const rider = new Container();
-  rider.position.set(-r * 0.05, -r * 0.98);
+  rider.position.set(-r * 0.06, -r * 1.02);
 
-  const backArm = pivot(arm(shade(faction, -0.35), SKIN, r * 0.95, r * 0.28), -r * 0.32, -r * 0.26);
+  const backArm = pivot(arm(shade(faction, -0.35), SKIN, r * 1.15, r * 0.34), -r * 0.4, -r * 0.28);
   const torsoHolder = new Container();
-  torsoHolder.addChild(torsoGraphic(r * 0.9, faction, undefined));
-  const riderHead = pivot(headGraphic(r * 0.9, faction, "helm"), 0, -r * 0.98);
-  const frontArm = pivot(arm(faction, SKIN, r * 0.95, r * 0.3), r * 0.34, -r * 0.24);
+  torsoHolder.addChild(torsoGraphic(r * 1.2, faction, undefined));
+  const riderHead = pivot(headGraphic(r * 1.2, faction, "helm"), 0, -r * 1.0);
+  const frontArm = pivot(arm(faction, SKIN, r * 1.15, r * 0.36), r * 0.44, -r * 0.26);
 
   const lance = new Graphics();
-  lance.roundRect(0, -r * 0.07, r * 2.6, r * 0.14, r * 0.06).fill(WOOD);
-  lance.roundRect(0, -r * 0.07, r * 2.6, r * 0.14, r * 0.06).stroke({
+  lance.roundRect(0, -r * 0.08, r * 2.6, r * 0.16, r * 0.06).fill(WOOD);
+  lance.roundRect(0, -r * 0.08, r * 2.6, r * 0.16, r * 0.06).stroke({
     width: 1.3,
     color: OUTLINE,
     alpha: 0.85,
   });
-  lance.poly([r * 2.54, -r * 0.2, r * 2.54, r * 0.24, r * 2.95, r * 0.02]).fill(STEEL);
-  lance.position.set(0, r * 0.7);
+  lance.poly([r * 2.54, -r * 0.22, r * 2.54, r * 0.26, r * 2.95, r * 0.02]).fill(STEEL);
+  lance.position.set(0, r * 0.82);
   frontArm.addChild(lance);
 
   rider.addChild(backArm, torsoHolder, riderHead, frontArm);
