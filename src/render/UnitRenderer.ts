@@ -296,28 +296,38 @@ export class UnitRenderer {
     rig.body.y = -bob * 0.95;
     rig.body.rotation = 0.05 * anim.move + attackK * 0.07;
 
-    rig.legFront.rotation = rig.walkSwing * swing;
-    rig.legBack.rotation = rig.walkSwing * -swing;
-
     // gather/tool motion for villagers
     const gatherK = Math.sin(nowSec * 6.5) * anim.gather;
 
-    if (rig.twoHanded) {
-      rig.armFront.rotation = 0.35 + rig.armSwing * 0.18 * swing;
-      rig.armBack.rotation = 0.85 + rig.armSwing * 0.18 * -swing;
-      if (rig.attackKind === "shoot") rig.armFront.rotation += attackK * 0.25;
-    } else if (rig.attackKind === "thrust") {
-      rig.armFront.rotation = rig.armSpread - 0.9 * attackK + rig.armSwing * -swing * 0.4;
-      rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.5;
-    } else if (rig.attackKind === "slash") {
-      rig.armFront.rotation = rig.armSpread - 1.7 * attackK + rig.armSwing * -swing * 0.4;
-      rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.5;
-    } else if (rig.attackKind === "tool") {
-      rig.armFront.rotation = rig.armSpread - 1.3 * attackK - gatherK * 1.1;
-      rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.4;
+    if (rig.horse) {
+      const gallop = Math.sin(anim.phase * 1.7);
+      rig.horse.legFront.rotation = 0.6 * gallop * (0.3 + anim.move * 0.9);
+      rig.horse.legBack.rotation = 0.6 * -gallop * (0.3 + anim.move * 0.9);
+      rig.horse.body.y = -Math.abs(gallop) * 1.8 * anim.move;
+      // rider couches the lance, thrusting on attack
+      rig.armFront.rotation = 0.15 + attackK * 1.0;
+      rig.armBack.rotation = 0.45 - attackK * 0.3;
     } else {
-      rig.armFront.rotation = rig.armSpread + rig.armSwing * -swing;
-      rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.7;
+      rig.legFront.rotation = rig.walkSwing * swing;
+      rig.legBack.rotation = rig.walkSwing * -swing;
+
+      if (rig.twoHanded) {
+        rig.armFront.rotation = 0.35 + rig.armSwing * 0.18 * swing;
+        rig.armBack.rotation = 0.85 + rig.armSwing * 0.18 * -swing;
+        if (rig.attackKind === "shoot") rig.armFront.rotation += attackK * 0.25;
+      } else if (rig.attackKind === "thrust") {
+        rig.armFront.rotation = rig.armSpread - 0.9 * attackK + rig.armSwing * -swing * 0.4;
+        rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.5;
+      } else if (rig.attackKind === "slash") {
+        rig.armFront.rotation = rig.armSpread - 1.7 * attackK + rig.armSwing * -swing * 0.4;
+        rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.5;
+      } else if (rig.attackKind === "tool") {
+        rig.armFront.rotation = rig.armSpread - 1.3 * attackK - gatherK * 1.1;
+        rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.4;
+      } else {
+        rig.armFront.rotation = rig.armSpread + rig.armSwing * -swing;
+        rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.7;
+      }
     }
 
     // secondary motion: torso squash + head follow-through
@@ -326,13 +336,6 @@ export class UnitRenderer {
     rig.torso.scale.set(1 + breathe * 0.4 - bob * 0.02, 1 - breathe + bob * 0.035);
     rig.head.y = -bob * 0.15 - r * 0.02;
     rig.head.rotation = Math.sin(anim.phase - 0.5) * 0.07 * anim.move + attackK * 0.05;
-
-    if (rig.horse) {
-      const gallop = Math.sin(anim.phase * 1.7);
-      rig.horse.legFront.rotation = 0.55 * gallop * (0.3 + anim.move * 0.9);
-      rig.horse.legBack.rotation = 0.55 * -gallop * (0.3 + anim.move * 0.9);
-      rig.horse.body.y = -Math.abs(gallop) * 1.6 * anim.move;
-    }
 
     this.drawFx(entry, r, anim);
   }
@@ -614,32 +617,37 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
   const horseLegFront = pivot(hl(HORSE), r * 0.55, r * 0.3);
   horse.addChild(horseLegBack, horseBody, horseLegFront);
 
+  // rider (positioned once; only the torso bob holder moves)
   const rider = new Container();
-  rider.position.set(-r * 0.05, -r * 0.92);
-  rider.addChild(torsoGraphic(r * 0.9, faction, undefined));
-  const riderHead = pivot(headGraphic(r * 0.9, faction, "helm"), 0, -r * 1.02);
-  rider.addChild(riderHead);
-  const riderArm = pivot(arm(faction, SKIN, r * 1.0, r * 0.3), r * 0.34, -r * 0.3);
+  rider.position.set(-r * 0.05, -r * 0.98);
+
+  const backArm = pivot(arm(shade(faction, -0.35), SKIN, r * 0.95, r * 0.28), -r * 0.32, -r * 0.26);
+  const torsoHolder = new Container();
+  torsoHolder.addChild(torsoGraphic(r * 0.9, faction, undefined));
+  const riderHead = pivot(headGraphic(r * 0.9, faction, "helm"), 0, -r * 0.98);
+  const frontArm = pivot(arm(faction, SKIN, r * 0.95, r * 0.3), r * 0.34, -r * 0.24);
+
   const lance = new Graphics();
-  lance.roundRect(-r * 0.06, -r * 0.06, r * 2.6, r * 0.13, r * 0.06).fill(WOOD);
-  lance.roundRect(-r * 0.06, -r * 0.06, r * 2.6, r * 0.13, r * 0.06).stroke({
+  lance.roundRect(0, -r * 0.07, r * 2.6, r * 0.14, r * 0.06).fill(WOOD);
+  lance.roundRect(0, -r * 0.07, r * 2.6, r * 0.14, r * 0.06).stroke({
     width: 1.3,
     color: OUTLINE,
     alpha: 0.85,
   });
   lance.poly([r * 2.54, -r * 0.2, r * 2.54, r * 0.24, r * 2.95, r * 0.02]).fill(STEEL);
-  riderArm.addChild(lance);
-  rider.addChild(riderArm);
+  lance.position.set(0, r * 0.7);
+  frontArm.addChild(lance);
 
+  rider.addChild(backArm, torsoHolder, riderHead, frontArm);
   body.addChild(horse, rider);
 
   return {
     root,
     body,
-    torso: rider,
+    torso: torsoHolder,
     head: riderHead,
-    armBack: riderArm,
-    armFront: riderArm,
+    armBack: backArm,
+    armFront: frontArm,
     legBack: horseLegBack,
     legFront: horseLegFront,
     horse: { legBack: horseLegBack, legFront: horseLegFront, body: horseBody },
@@ -647,7 +655,7 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
     armSwing: 0.1,
     armSpread: 0,
     stride: 10,
-    twoHanded: true,
+    twoHanded: false,
     attackKind: "cavalry",
   };
 }
