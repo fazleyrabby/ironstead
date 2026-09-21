@@ -268,8 +268,8 @@ export class UnitRenderer {
     const working = unit.state === "gathering" || unit.state === "repairing";
     const attacking = unit.state === "attacking";
 
-    anim.move += ((moving ? 1 : 0) - anim.move) * Math.min(1, frameDt * 9 + 0.05);
-    anim.gather += ((working ? 1 : 0) - anim.gather) * Math.min(1, frameDt * 8 + 0.04);
+    anim.move += ((moving ? 1 : 0) - anim.move) * Math.min(1, frameDt * 6 + 0.03);
+    anim.gather += ((working ? 1 : 0) - anim.gather) * Math.min(1, frameDt * 5 + 0.03);
 
     const speedFactor = Math.max(0.7, Math.min(1.6, unitDef(unit.type).speed / 70));
     anim.phase += frameDt * rig.stride * speedFactor * (0.35 + anim.move);
@@ -293,7 +293,8 @@ export class UnitRenderer {
 
     rig.root.scale.set(anim.facing, 1);
     rig.body.x = lunge;
-    rig.body.rotation = 0.05 * anim.move + attackK * 0.06;
+    rig.body.y = -bob * 0.95;
+    rig.body.rotation = 0.05 * anim.move + attackK * 0.07;
 
     rig.legFront.rotation = rig.walkSwing * swing;
     rig.legBack.rotation = rig.walkSwing * -swing;
@@ -319,11 +320,12 @@ export class UnitRenderer {
       rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.7;
     }
 
+    // secondary motion: torso squash + head follow-through
     const breathe = Math.sin(nowSec * 2.2) * 0.02;
-    rig.torso.y = -bob * 0.8;
-    rig.torso.scale.set(1 + breathe * 0.5, 1 - breathe);
-    rig.head.y = -bob * 0.25 - r * 0.02;
-    rig.head.rotation = sin * 0.05 * anim.move;
+    rig.torso.y = -bob * 0.25;
+    rig.torso.scale.set(1 + breathe * 0.4 - bob * 0.02, 1 - breathe + bob * 0.035);
+    rig.head.y = -bob * 0.15 - r * 0.02;
+    rig.head.rotation = Math.sin(anim.phase - 0.5) * 0.07 * anim.move + attackK * 0.05;
 
     if (rig.horse) {
       const gallop = Math.sin(anim.phase * 1.7);
@@ -513,21 +515,21 @@ function buildRig(unit: Unit): Rig {
   const back = shade(faction, -0.4);
   const boot = 0x5a3d22;
 
-  const legLength = r * 1.2;
+  const legLength = r * 1.25;
   const legWidth = r * 0.44;
-  const legBack = pivot(limb(back, boot, legLength, legWidth), -r * 0.3, r * 0.28);
-  const legFront = pivot(limb(faction, boot, legLength, legWidth), r * 0.3, r * 0.28);
+  const legBack = pivot(limb(back, boot, legLength, legWidth), -r * 0.3, r * 0.34);
+  const legFront = pivot(limb(faction, boot, legLength, legWidth), r * 0.3, r * 0.34);
 
   const torso = new Container();
-  torso.position.set(0, r * 0.05);
+  torso.position.set(0, r * 0.02);
   torso.addChild(torsoGraphic(r, faction, type === "hero" ? shade(faction, -0.45) : undefined));
 
-  const head = pivot(headGraphic(r, faction, headGear(type)), 0, -r * 1.06);
+  const head = pivot(headGraphic(r, faction, headGear(type)), 0, -r * 1.3);
 
-  const armLength = r * 1.15;
+  const armLength = r * 1.08;
   const armWidth = r * 0.34;
-  const armBack = pivot(arm(back, SKIN, armLength, armWidth), -r * 0.74, -r * 0.24);
-  const armFront = pivot(arm(faction, SKIN, armLength, armWidth), r * 0.74, -r * 0.24);
+  const armBack = pivot(arm(back, SKIN, armLength, armWidth), -r * 0.8, -r * 0.1);
+  const armFront = pivot(arm(faction, SKIN, armLength, armWidth), r * 0.8, -r * 0.1);
   const weapon = buildWeapon(type);
   weapon.position.set(0, armLength * 0.72);
   armFront.addChild(weapon);
@@ -543,8 +545,8 @@ function buildRig(unit: Unit): Rig {
     armFront,
     legBack,
     legFront,
-    walkSwing: type === "villager" ? 0.5 : 0.62,
-    armSwing: 0.5,
+    walkSwing: type === "villager" ? 0.55 : 0.7,
+    armSwing: 0.55,
     armSpread: 0.14,
     stride: type === "villager" ? 8 : 7.2,
     twoHanded: type === "crossbowman",
@@ -615,7 +617,7 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
   const rider = new Container();
   rider.position.set(-r * 0.05, -r * 0.92);
   rider.addChild(torsoGraphic(r * 0.9, faction, undefined));
-  const riderHead = pivot(headGraphic(r * 0.9, faction, "helm"), 0, -r * 0.92);
+  const riderHead = pivot(headGraphic(r * 0.9, faction, "helm"), 0, -r * 1.02);
   rider.addChild(riderHead);
   const riderArm = pivot(arm(faction, SKIN, r * 1.0, r * 0.3), r * 0.34, -r * 0.3);
   const lance = new Graphics();
