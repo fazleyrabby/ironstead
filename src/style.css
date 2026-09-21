@@ -627,3 +627,29 @@ body.menu-open #ui {
 .outcome-btn:hover {
   background: linear-gradient(180deg, #4f8ef7, #2f6fe0);
 }
+
+.minimap {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 10;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  line-height: 0;
+}
+
+.minimap canvas {
+  display: block;
+  border-radius: 6px;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+body.menu-open .minimap {
+  display: none;
+}

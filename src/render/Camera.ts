@@ -38,6 +38,19 @@ export class Camera {
     };
   }
 
+  zoomLevel(): number {
+    return this.zoom;
+  }
+
+  viewBounds(): { x: number; y: number; width: number; height: number } {
+    return {
+      x: -this.view.x / this.zoom,
+      y: -this.view.y / this.zoom,
+      width: this.viewportW / this.zoom,
+      height: this.viewportH / this.zoom,
+    };
+  }
+
   setPanKey(code: string, down: boolean): void {
     if (down) this.keys.add(code);
     else this.keys.delete(code);

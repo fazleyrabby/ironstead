@@ -24,6 +24,7 @@ import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
 import { MainMenu } from "./ui/MainMenu";
+import { Minimap } from "./ui/Minimap";
 import { OutcomeOverlay } from "./ui/OutcomeOverlay";
 import { SoundFX } from "./audio/sfx";
 
@@ -93,6 +94,9 @@ async function main(): Promise<void> {
   });
   const commandPanel = new CommandPanel(hudBottom, (command) => game.execute(command));
   const outcome = new OutcomeOverlay(document.body, () => window.location.reload());
+  const minimap = new Minimap(document.body, {
+    onNavigate: (x, y) => camera.centerOn(x, y, camera.zoomLevel()),
+  });
 
   let started = false;
   new MainMenu(document.body, {
@@ -382,6 +386,7 @@ async function main(): Promise<void> {
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state, loop.timeScale);
       commandPanel.update(game.state);
+      minimap.update(game.state, game.visibility.player, camera);
       outcome.update(game.state.status, game.state.stats, game.state.time);
       app.renderer.render(app.stage);
     },
