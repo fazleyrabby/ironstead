@@ -11,20 +11,21 @@ const TILE = 1; // one unit per tile; renderer scales to screen
  */
 export class VoxelWorld {
   readonly group: THREE.Group;
-  private readonly groundMat: THREE.MeshBasicMaterial;
-  private readonly waterMat: THREE.MeshBasicMaterial;
-  private readonly bridgeMat: THREE.MeshBasicMaterial;
+  private readonly groundMat: THREE.MeshLambertMaterial;
+  private readonly waterMat: THREE.MeshLambertMaterial;
+  private readonly bridgeMat: THREE.MeshLambertMaterial;
 
   constructor(debug = false) {
     this.group = new THREE.Group();
-    this.groundMat = new THREE.MeshBasicMaterial({ color: 0x8bc34a, wireframe: debug });
-    this.waterMat = new THREE.MeshBasicMaterial({
-      color: 0x286ba8,
+    this.groundMat = new THREE.MeshLambertMaterial({ color: 0x8bc34a, wireframe: debug });
+    this.waterMat = new THREE.MeshLambertMaterial({
+      color: 0x2f7fc4,
+      emissive: 0x0a2540,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.85,
       wireframe: debug,
     });
-    this.bridgeMat = new THREE.MeshBasicMaterial({ color: 0x8b5a2b, wireframe: debug });
+    this.bridgeMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b, wireframe: debug });
   }
 
   /** Rebuild terrain from a VoxelNav: one ground slab, water tiles on top,

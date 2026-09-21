@@ -31,9 +31,9 @@ describe("VoxelAssets models", () => {
 
   it("tints enemy models differently from player models", () => {
     const playerMat = (buildingModel(fakeBuilding("house", "player")).children[0] as THREE.Mesh)
-      .material as THREE.MeshBasicMaterial;
+      .material as THREE.MeshLambertMaterial;
     const enemyMat = (buildingModel(fakeBuilding("house", "enemy")).children[0] as THREE.Mesh)
-      .material as THREE.MeshBasicMaterial;
+      .material as THREE.MeshLambertMaterial;
     expect(playerMat.color.getHex()).not.toBe(enemyMat.color.getHex());
   });
 

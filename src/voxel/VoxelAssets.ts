@@ -7,7 +7,7 @@ import type { Building, GameState, PlayerId, Unit } from "../sim/types";
 export const VOXEL_SCALE = 0.25;
 
 const geoCache = new Map<string, THREE.BoxGeometry>();
-const matCache = new Map<number, THREE.MeshBasicMaterial>();
+const matCache = new Map<number, THREE.MeshLambertMaterial>();
 
 function geo(w: number, h: number, d: number): THREE.BoxGeometry {
   const key = `${w}|${h}|${d}`;
@@ -19,10 +19,10 @@ function geo(w: number, h: number, d: number): THREE.BoxGeometry {
   return g;
 }
 
-function mat(color: number): THREE.MeshBasicMaterial {
+function mat(color: number): THREE.MeshLambertMaterial {
   let m = matCache.get(color);
   if (!m) {
-    m = new THREE.MeshBasicMaterial({ color });
+    m = new THREE.MeshLambertMaterial({ color });
     matCache.set(color, m);
   }
   return m;

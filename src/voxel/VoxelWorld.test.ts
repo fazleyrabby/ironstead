@@ -30,9 +30,9 @@ describe("VoxelWorld.build", () => {
     const children = world.group.children;
     // meshes only (materials are not in the group)
     const meshes = children.filter((o) => (o as THREE.Mesh).isMesh) as THREE.Mesh[];
-    const water = meshes.filter((m) => (m.material as THREE.MeshBasicMaterial).color.getHex() === 0x286ba8);
-    const ground = meshes.filter((m) => (m.material as THREE.MeshBasicMaterial).color.getHex() === 0x8bc34a);
-    const bridge = meshes.filter((m) => (m.material as THREE.MeshBasicMaterial).color.getHex() === 0x8b5a2b);
+    const water = meshes.filter((m) => (m.material as THREE.MeshLambertMaterial).color.getHex() === 0x2f7fc4);
+    const ground = meshes.filter((m) => (m.material as THREE.MeshLambertMaterial).color.getHex() === 0x8bc34a);
+    const bridge = meshes.filter((m) => (m.material as THREE.MeshLambertMaterial).color.getHex() === 0x8b5a2b);
 
     expect(water.length).toBe(34); // all tiles except the 2 ground islands
     expect(bridge.length).toBe(2); // exactly the two bridge deck tiles

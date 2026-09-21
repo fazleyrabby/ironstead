@@ -38,11 +38,15 @@ export class VoxelScene {
     this.camera.position.set(24, 22, 28);
     this.camera.lookAt(0, 0, 0);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    const hemi = new THREE.HemisphereLight(0xdfeaff, 0x4a5a3a, 1.05);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.5);
-    sun.position.set(-10, 20, -10);
+    const sun = new THREE.DirectionalLight(0xfff2d8, 1.0);
+    sun.position.set(-24, 40, -18);
     this.scene.add(sun);
+    // soft fill from the opposite side so dark faces aren't pitch black
+    const fill = new THREE.DirectionalLight(0x93b4ff, 0.35);
+    fill.position.set(20, 14, 24);
+    this.scene.add(fill);
 
     this.world = new VoxelWorld(false);
     this.scene.add(this.world.group);
