@@ -14,9 +14,10 @@ const FACTION_COLORS: Record<PlayerId, number> = {
 };
 
 const OUTLINE = PALETTE.outline;
+const ROOF_BLUE = 0x3b6db3;
+const GOLD_NUGGET = 0xf2c14e;
 const STONE = 0xa8a29a;
 const STONE_DARK = 0x79736b;
-const WOOD = 0x8a5a2b;
 const WOOD_DARK = 0x5f3c1c;
 const WINDOW_LIT = 0xffd97a;
 const CANVAS_TENT = 0xe4d6b8;
@@ -457,18 +458,20 @@ function drawHouse(g: Graphics, building: Building, faction: number): void {
 function drawFarm(g: Graphics, building: Building): void {
   const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
   const lw = line(w);
   shadow(g, w, h);
 
-  g.roundRect(-w / 2, -h / 2, w, h, 8).fill(0x8a6a45);
-  g.roundRect(-w / 2, -h / 2, w, h, 8).stroke({ width: lw, color: OUTLINE, alpha: 0.85 });
+  g.roundRect(-w / 2, -h / 2, w, h, 8).fill(STYLE.soil);
+  g.roundRect(-w / 2, -h / 2, w, h, 8).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
+  g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h * 0.07, 3).fill({ color: 0xffffff, alpha: 0.07 });
   for (let r = 0; r < 3; r += 1) {
     const ry = -h * 0.32 + r * h * 0.3;
-    g.roundRect(-w * 0.42, ry, w * 0.84, h * 0.16, 4).fill(0x5d8a3c);
+    g.roundRect(-w * 0.42, ry, w * 0.84, h * 0.14, 4).fill(STYLE.cropDark);
     for (let c = 0; c < 5; c += 1) {
       const cx = -w * 0.34 + c * w * 0.17;
-      g.circle(cx, ry + h * 0.08, Math.max(2, w * 0.03)).fill(0x7ee081);
+      const cs = Math.max(2, w * 0.035);
+      g.circle(cx, ry + h * 0.07, cs).fill(STYLE.crop);
+      g.circle(cx - cs * 0.35, ry + h * 0.045, cs * 0.4).fill({ color: 0xffffff, alpha: 0.35 });
     }
   }
 
@@ -476,43 +479,45 @@ function drawFarm(g: Graphics, building: Building): void {
   const barnH = h * 0.3;
   const bx = w * 0.12;
   const by = -h * 0.44;
-  timberWall(g, bx, by, barnW, barnH, colors.body, lw);
-  gableRoof(g, bx - 2, by - h * 0.14, by + 1, barnW + 4, colors.roof, lw);
+  timberWall(g, bx, by, barnW, barnH, STYLE.woodLight, lw);
+  gableRoof(g, bx - 2, by - h * 0.14, by + 1, barnW + 4, ROOF_BLUE, lw);
 
-  g.circle(-w * 0.32, h * 0.32, w * 0.09).fill(colors.accent);
-  g.circle(-w * 0.32, h * 0.32, w * 0.09).stroke({ width: 1.5, color: WOOD_DARK, alpha: 0.9 });
-  g.rect(-w * 0.32 - w * 0.09, h * 0.32 - 1, w * 0.18, 2).fill(WOOD_DARK);
+  g.rect(-w * 0.34 - 1.2, h * 0.08, 2.4, h * 0.3).fill(STYLE.woodDark);
+  g.rect(-w * 0.4, h * 0.14, w * 0.14, 2.4).fill(STYLE.woodDark);
+  g.circle(-w * 0.34, h * 0.06, w * 0.05).fill(0xd9b382);
+  g.circle(-w * 0.34, h * 0.06, w * 0.05).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+  g.poly([-w * 0.4, h * 0.14, -w * 0.28, h * 0.14, -w * 0.34, h * 0.26]).fill(0xc0392b);
 
   for (let i = 0; i < 4; i += 1) {
     const fx = -w * 0.46 + i * w * 0.12;
-    g.rect(fx, h * 0.18, 3, h * 0.22).fill(WOOD);
+    g.rect(fx, h * 0.18, 3, h * 0.22).fill(STYLE.wood);
   }
-  g.rect(-w * 0.46, h * 0.24, w * 0.38, 3).fill(WOOD);
+  g.rect(-w * 0.46, h * 0.24, w * 0.38, 3).fill(STYLE.wood);
 }
 
 function drawStorage(g: Graphics, building: Building, faction: number): void {
   const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
   const lw = line(w);
   shadow(g, w, h);
   foundation(g, w * 0.9, h * 0.9, lw);
 
   const wallH = h * 0.4;
   const wallY = -h * 0.08;
-  timberWall(g, -w * 0.34, wallY, w * 0.68, wallH, colors.body, lw);
-  gableRoof(g, -w * 0.4, wallY - h * 0.26, wallY + 2, w * 0.8, colors.roof, lw);
+  timberWall(g, -w * 0.34, wallY, w * 0.68, wallH, STYLE.woodLight, lw);
+  gableRoof(g, -w * 0.4, wallY - h * 0.26, wallY + 2, w * 0.8, ROOF_BLUE, lw);
 
-  g.roundRect(-w * 0.13, wallY + wallH - h * 0.24, w * 0.26, h * 0.24, 3).fill(WOOD_DARK);
+  g.roundRect(-w * 0.13, wallY + wallH - h * 0.24, w * 0.26, h * 0.24, 3).fill(STYLE.woodDark);
   g.rect(-w * 0.13, wallY + wallH - h * 0.13, w * 0.26, 2).fill({ color: faction, alpha: 0.9 });
 
-  g.roundRect(-w * 0.44, h * 0.22, w * 0.2, h * 0.16, 2).fill(0xc8a878);
+  g.roundRect(-w * 0.44, h * 0.22, w * 0.2, h * 0.16, 2).fill(STYLE.sand);
   g.roundRect(-w * 0.44, h * 0.22, w * 0.2, h * 0.16, 2).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
-  g.rect(-w * 0.44, h * 0.28, w * 0.2, 2).fill(WOOD_DARK);
-  g.circle(w * 0.34, h * 0.3, w * 0.1).fill(0xa0763e);
+  g.rect(-w * 0.44, h * 0.28, w * 0.2, 2).fill(STYLE.woodDark);
+  g.circle(w * 0.34, h * 0.3, w * 0.1).fill(STYLE.wood);
   g.circle(w * 0.34, h * 0.3, w * 0.1).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
-  g.rect(w * 0.24, h * 0.26, w * 0.2, 2.5).fill(WOOD_DARK);
-  g.rect(w * 0.24, h * 0.34, w * 0.2, 2.5).fill(WOOD_DARK);
+  g.rect(w * 0.24, h * 0.26, w * 0.2, 2.5).fill(STYLE.woodDark);
+  g.rect(w * 0.24, h * 0.34, w * 0.2, 2.5).fill(STYLE.woodDark);
+  pennant(g, 0, wallY - h * 0.26 + 2, w * 0.12, faction);
 }
 
 function drawCamp(g: Graphics, building: Building, faction: number): void {
@@ -521,29 +526,29 @@ function drawCamp(g: Graphics, building: Building, faction: number): void {
   const lw = line(w);
   shadow(g, w, h);
 
-  g.ellipse(0, h * 0.1, w * 0.46, h * 0.4).fill(0x9a7f57);
+  g.ellipse(0, h * 0.1, w * 0.46, h * 0.4).fill(STYLE.dirt);
   g.ellipse(0, h * 0.1, w * 0.46, h * 0.4).stroke({ width: lw, color: OUTLINE, alpha: 0.85 });
 
   for (let i = 0; i < 6; i += 1) {
     const px = -w * 0.42 + i * w * 0.17;
-    g.poly([px - 5, -h * 0.34, px + 5, -h * 0.34, px, -h * 0.44]).fill(WOOD);
-    g.rect(px - 5, -h * 0.34, 10, h * 0.1).fill(WOOD);
+    g.poly([px - 5, -h * 0.34, px + 5, -h * 0.34, px, -h * 0.44]).fill(STYLE.wood);
+    g.rect(px - 5, -h * 0.34, 10, h * 0.1).fill(STYLE.wood);
   }
-  g.rect(-w * 0.44, -h * 0.3, w * 0.88, 4).fill(WOOD_DARK);
+  g.rect(-w * 0.44, -h * 0.3, w * 0.88, 4).fill(STYLE.woodDark);
 
   tent(g, -w * 0.22, h * 0.05, w * 0.3, h * 0.34, lw);
   tent(g, w * 0.22, h * 0.12, w * 0.24, h * 0.27, lw);
 
-  g.circle(w * 0.02, h * 0.3, w * 0.07).fill(STONE_DARK);
+  g.circle(w * 0.02, h * 0.3, w * 0.07).fill(STYLE.stoneDark);
   g.poly([w * 0.02 - 5, h * 0.3 + 3, w * 0.02 + 5, h * 0.3 + 3, w * 0.02, h * 0.3 - 9]).fill(0xf08a2d);
   g.poly([w * 0.02 - 2.5, h * 0.3 + 3, w * 0.02 + 2.5, h * 0.3 + 3, w * 0.02, h * 0.3 - 4]).fill(0xf6d76a);
 
-  g.rect(-w * 0.4, -h * 0.05, 3, h * 0.3).fill(WOOD_DARK);
-  g.rect(-w * 0.4 + 3, -h * 0.05, w * 0.16, 3).fill(WOOD_DARK);
+  g.rect(-w * 0.4, -h * 0.05, 3, h * 0.3).fill(STYLE.woodDark);
+  g.rect(-w * 0.4 + 3, -h * 0.05, w * 0.16, 3).fill(STYLE.woodDark);
   g.circle(-w * 0.4 + 3 + w * 0.08, -h * 0.05 - 4, 4).fill(0xd9b382);
 
   pennant(g, w * 0.38, -h * 0.32, w * 0.12, faction);
-  g.rect(w * 0.38 - 1.5, -h * 0.32 - 13, 3, h * 0.5).fill(WOOD_DARK);
+  g.rect(w * 0.38 - 1.5, -h * 0.32 - 13, 3, h * 0.5).fill(STYLE.woodDark);
 }
 
 function tent(g: Graphics, cx: number, baseY: number, w: number, h: number, lw: number): void {
@@ -557,26 +562,28 @@ function tent(g: Graphics, cx: number, baseY: number, w: number, h: number, lw: 
     color: 0x000000,
     alpha: 0.35,
   });
-  g.rect(cx - 1.5, baseY - h - 4, 3, h + 8).fill(WOOD_DARK);
+  g.rect(cx - 1.5, baseY - h - 4, 3, h + 8).fill(STYLE.woodDark);
 }
 
 function drawTower(g: Graphics, building: Building, faction: number): void {
   const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
   const lw = line(w);
   shadow(g, w * 1.2, h * 1.2);
 
   const baseW = w * 0.78;
-  g.poly([-baseW / 2, h / 2, -w * 0.3, -h * 0.28, w * 0.3, -h * 0.28, baseW / 2, h / 2]).fill(colors.body);
+  g.poly([-baseW / 2, h / 2, -w * 0.3, -h * 0.28, w * 0.3, -h * 0.28, baseW / 2, h / 2]).fill(STYLE.stone);
   g.poly([-baseW / 2, h / 2, -w * 0.3, -h * 0.28, w * 0.3, -h * 0.28, baseW / 2, h / 2]).stroke({
     width: lw,
     color: OUTLINE,
     alpha: 0.9,
   });
+  g.poly([-baseW / 2 + 3, h * 0.4, -w * 0.24, -h * 0.2, w * 0.24, -h * 0.2, baseW / 2 - 3, h * 0.4]).fill(
+    STYLE.stoneLight,
+  );
   g.rect(-baseW / 2 + 2, 0, baseW - 4, 3).fill({ color: 0x000000, alpha: 0.15 });
 
-  g.roundRect(-w * 0.42, -h * 0.48, w * 0.84, h * 0.24, 2).fill(WOOD);
+  g.roundRect(-w * 0.42, -h * 0.48, w * 0.84, h * 0.24, 2).fill(STYLE.woodLight);
   g.roundRect(-w * 0.42, -h * 0.48, w * 0.84, h * 0.24, 2).stroke({
     width: lw,
     color: OUTLINE,
@@ -584,18 +591,18 @@ function drawTower(g: Graphics, building: Building, faction: number): void {
   });
   for (let i = 0; i < 3; i += 1) {
     const bx = -w * 0.42 + i * w * 0.28;
-    g.rect(bx + 1, -h * 0.48 - 5, w * 0.28 - 2, 6).fill(colors.body);
+    g.rect(bx + 1, -h * 0.48 - 5, w * 0.28 - 2, 6).fill(STYLE.stone);
+    g.rect(bx + 1, -h * 0.48 - 5, w * 0.28 - 2, 6).stroke({ width: 1.2, color: OUTLINE, alpha: 0.9 });
   }
 
   windowLit(g, 0, h * 0.1, Math.max(4, w * 0.16));
-  g.rect(-1.5, -h * 0.48 - 16, 3, 16).fill(WOOD_DARK);
+  g.rect(-1.5, -h * 0.48 - 16, 3, 16).fill(STYLE.woodDark);
   g.poly([1.5, -h * 0.48 - 16, 1.5 + w * 0.3, -h * 0.48 - 12, 1.5, -h * 0.48 - 8]).fill(faction);
 }
 
 function drawAcademy(g: Graphics, building: Building, faction: number): void {
   const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
   const lw = line(w);
   shadow(g, w, h);
   foundation(g, w * 0.94, h * 0.94, lw);
@@ -603,11 +610,11 @@ function drawAcademy(g: Graphics, building: Building, faction: number): void {
   const hallW = w * 0.72;
   const hallH = h * 0.42;
   const hallY = h * 0.0;
-  timberWall(g, -hallW / 2, hallY, hallW, hallH, colors.body, lw);
+  timberWall(g, -hallW / 2, hallY, hallW, hallH, 0xefe0c0, lw);
 
   for (let i = 0; i < 4; i += 1) {
     const cx = -hallW / 2 + (i + 0.5) * (hallW / 4);
-    g.roundRect(cx - w * 0.045, hallY - h * 0.02, w * 0.09, hallH + h * 0.04, 3).fill(colors.accent);
+    g.roundRect(cx - w * 0.045, hallY - h * 0.02, w * 0.09, hallH + h * 0.04, 3).fill(STYLE.woodLight);
     g.roundRect(cx - w * 0.045, hallY - h * 0.02, w * 0.09, hallH + h * 0.04, 3).stroke({
       width: 1.5,
       color: OUTLINE,
@@ -615,13 +622,13 @@ function drawAcademy(g: Graphics, building: Building, faction: number): void {
     });
   }
 
-  g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).fill(colors.roof);
+  g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).fill(ROOF_BLUE);
   g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).stroke({
     width: lw,
     color: OUTLINE,
     alpha: 0.9,
   });
-  g.circle(0, hallY - h * 0.1, w * 0.055).fill(colors.accent);
+  g.circle(0, hallY - h * 0.1, w * 0.055).fill(STYLE.stoneLight);
   g.circle(0, hallY - h * 0.1, w * 0.055).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
 
   door(g, 0, hallY + hallH, w * 0.15, h * 0.22);
@@ -630,17 +637,18 @@ function drawAcademy(g: Graphics, building: Building, faction: number): void {
   pennant(g, hallW / 2 - 2, hallY - h * 0.26 + 2, w * 0.13, faction);
 }
 
-function drawWall(g: Graphics, building: Building): void {  const w = building.width;
+function drawWall(g: Graphics, building: Building): void {
+  const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
   const lw = line(w);
   shadow(g, w, h);
 
-  g.roundRect(-w / 2, -h / 2, w, h, 3).fill(colors.body);
-  g.roundRect(-w / 2, -h / 2, w, h * 0.4, 3).fill(colors.accent);
+  g.roundRect(-w / 2, -h / 2, w, h, 3).fill(STYLE.stone);
+  brickwork(g, -w / 2, -h / 2, w, h, STYLE.stoneDark, 2);
+  g.roundRect(-w / 2, -h / 2, w, h * 0.4, 3).fill(STYLE.stoneLight);
   for (let i = 0; i < 4; i += 1) {
     const bx = -w / 2 + (i * w) / 4;
-    g.rect(bx + 1, -h / 2 - 5, w / 4 - 2, 7).fill(colors.body);
+    g.rect(bx + 1, -h / 2 - 5, w / 4 - 2, 7).fill(STYLE.stone);
     g.rect(bx + 1, -h / 2 - 5, w / 4 - 2, 7).stroke({ width: 1.2, color: OUTLINE, alpha: 0.9 });
   }
   g.roundRect(-w / 2, -h / 2, w, h, 3).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
@@ -650,27 +658,26 @@ function drawWall(g: Graphics, building: Building): void {  const w = building.w
 function drawForest(g: Graphics, building: Building): void {
   const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
-  pine(g, -w * 0.2, -h * 0.05, w * 0.3, colors);
-  pine(g, w * 0.2, h * 0.08, w * 0.26, colors);
-  pine(g, w * 0.02, -h * 0.22, w * 0.24, colors);
+  pine(g, -w * 0.2, -h * 0.05, w * 0.3);
+  pine(g, w * 0.2, h * 0.08, w * 0.26);
+  pine(g, w * 0.02, -h * 0.22, w * 0.24);
 }
 
-function pine(g: Graphics, x: number, y: number, size: number, colors: { body: number; roof: number; accent: number }): void {
-  g.ellipse(x, y + size * 0.55, size * 0.5, size * 0.2).fill({ color: 0x000000, alpha: 0.15 });
-  g.rect(x - size * 0.08, y + size * 0.1, size * 0.16, size * 0.45).fill(0x6b4423);
+function pine(g: Graphics, x: number, y: number, size: number): void {
+  g.ellipse(x, y + size * 0.55, size * 0.5, size * 0.2).fill({ color: 0x000000, alpha: 0.16 });
+  g.rect(x - size * 0.08, y + size * 0.1, size * 0.16, size * 0.45).fill(STYLE.woodDark);
   const layers: Array<[number, number]> = [
     [size * 0.5, y - size * 0.1],
     [size * 0.38, y - size * 0.38],
     [size * 0.26, y - size * 0.62],
   ];
+  const shades = [STYLE.leafDark, STYLE.leaf, STYLE.leafLight];
   layers.forEach(([half, ly], i) => {
-    const shade = i === 0 ? colors.body : i === 1 ? colors.roof : colors.accent;
-    g.poly([x - half, ly, x + half, ly, x, ly - size * 0.4]).fill(shade);
+    g.poly([x - half, ly, x + half, ly, x, ly - size * 0.4]).fill(shades[i]);
     g.poly([x - half, ly, x + half, ly, x, ly - size * 0.4]).stroke({
       width: 1.5,
       color: OUTLINE,
-      alpha: 0.7,
+      alpha: 0.75,
     });
   });
 }
@@ -678,11 +685,12 @@ function pine(g: Graphics, x: number, y: number, size: number, colors: { body: n
 function drawGold(g: Graphics, building: Building): void {
   const w = building.width;
   const h = building.height;
-  const colors = def(building.type).colors;
   g.ellipse(0, h * 0.36, w * 0.5, h * 0.2).fill({ color: 0x000000, alpha: 0.16 });
-  g.ellipse(-w * 0.15, h * 0.05, w * 0.3, h * 0.28).fill(colors.body);
-  g.ellipse(w * 0.18, h * 0.12, w * 0.24, h * 0.22).fill(STONE_DARK);
+  g.ellipse(-w * 0.15, h * 0.05, w * 0.3, h * 0.28).fill(STYLE.stone);
+  g.ellipse(w * 0.18, h * 0.12, w * 0.24, h * 0.22).fill(STYLE.stoneDark);
   g.ellipse(-w * 0.15, h * 0.05, w * 0.3, h * 0.28).stroke({ width: 2.5, color: OUTLINE, alpha: 0.85 });
+  g.ellipse(w * 0.18, h * 0.12, w * 0.24, h * 0.22).stroke({ width: 1.8, color: OUTLINE, alpha: 0.85 });
+  g.ellipse(-w * 0.22, -h * 0.05, w * 0.12, h * 0.1).fill({ color: STYLE.stoneLight, alpha: 0.8 });
 
   const nuggets: Array<[number, number, number]> = [
     [-0.2, -0.02, 0.075],
@@ -691,7 +699,7 @@ function drawGold(g: Graphics, building: Building): void {
     [0.24, 0.12, 0.05],
   ];
   for (const [nx, ny, nr] of nuggets) {
-    g.circle(nx * w, ny * h, nr * w).fill(colors.accent);
+    g.circle(nx * w, ny * h, nr * w).fill(GOLD_NUGGET);
     g.circle(nx * w, ny * h, nr * w).stroke({ width: 1.5, color: 0x7a5a12, alpha: 0.9 });
     g.circle(nx * w - nr * w * 0.3, ny * h - nr * w * 0.3, nr * w * 0.35).fill(0xffffff);
   }
