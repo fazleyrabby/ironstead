@@ -3,4 +3,7 @@ dist
 *.local
 .DS_Store
 .playwright-mcp
+plan.md
+prd.md
+build-toggle.png
 
