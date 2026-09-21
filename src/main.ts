@@ -162,6 +162,10 @@ async function main(): Promise<void> {
     return hit;
   }
 
+  const DOUBLE_CLICK_MS = 300;
+  let lastClickAt = 0;
+  let lastClickType: UnitType | undefined;
+
   function handlePrimary(screenX: number, screenY: number): void {
     const worldPoint = camera.screenToWorld(screenX, screenY);
     const pending = game.state.ui.pendingBuild;
@@ -180,9 +184,34 @@ async function main(): Promise<void> {
 
     const hitUnit = unitAtPoint(worldPoint.x, worldPoint.y);
     if (hitUnit) {
-      game.execute({ type: "SELECT_UNITS", unitIds: [hitUnit.id] });
+      const now = performance.now();
+      const doubleClick =
+        now - lastClickAt < DOUBLE_CLICK_MS && lastClickType === hitUnit.type;
+      lastClickAt = now;
+      lastClickType = hitUnit.type;
+
+      if (doubleClick) {
+        // AoE-style: select every unit of the same type currently on screen
+        const bounds = camera.viewBounds();
+        const ids = game.state.players.player.units
+          .filter(
+            (unit) =>
+              unit.state !== "dead" &&
+              unit.type === hitUnit.type &&
+              unit.x >= bounds.x &&
+              unit.x <= bounds.x + bounds.width &&
+              unit.y >= bounds.y &&
+              unit.y <= bounds.y + bounds.height,
+          )
+          .map((unit) => unit.id);
+        game.execute({ type: "SELECT_UNITS", unitIds: ids });
+      } else {
+        game.execute({ type: "SELECT_UNITS", unitIds: [hitUnit.id] });
+      }
       return;
     }
+
+    lastClickType = undefined;
 
     const tile = worldToTile(worldPoint.x, worldPoint.y);
     const hitBuilding =
