@@ -107,6 +107,17 @@ body {
   justify-content: center;
 }
 
+.hud-sound {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid var(--panel-border);
+  font-size: 13px;
+}
+
+.hud-sound:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 #hud-bottom {
   position: absolute;
   bottom: 0;

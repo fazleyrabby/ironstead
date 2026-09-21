@@ -3,7 +3,8 @@ import { PONDS } from "../config/map";
 import { GRID_COLS, GRID_ROWS, TILE_SIZE } from "../config/world";
 import type { Command } from "./commands";
 import { canPlace } from "./placement";
-import { def, freeWorkerSlots, spendCost } from "./selectors";
+import { def, canAfford, freeWorkerSlots, spendCost } from "./selectors";
+import { RESEARCH } from "../config/research";
 import { createInitialState, spawnBuilding, spawnUnit } from "./GameState";
 import { NavGrid } from "./navgrid";
 import { nearestFreeTile, tileToWorldCenter } from "./pathfinding";
@@ -17,6 +18,7 @@ import { HeroSystem } from "./systems/HeroSystem";
 import { MovementSystem } from "./systems/MovementSystem";
 import { ProductionSystem } from "./systems/ProductionSystem";
 import { ProjectileSystem } from "./systems/ProjectileSystem";
+import { RepairSystem } from "./systems/RepairSystem";
 import { HERO } from "../config/hero";
 import type { Building, BuildingType, GameState, PlayerId, Unit } from "./types";
 
@@ -36,6 +38,7 @@ export class Game {
   private readonly economy = new EconomySystem();
   private readonly construction: ConstructionSystem;
   private readonly projectiles: ProjectileSystem;
+  private readonly repair: RepairSystem;
   private readonly ai = new AISystem();
   private readonly queue: Command[] = [];
   private visibilityTimer = 0;
@@ -53,6 +56,7 @@ export class Game {
     this.production = new ProductionSystem(events, this.nav);
     this.combat = new CombatSystem(events, this.nav);
     this.hero = new HeroSystem(events);
+    this.repair = new RepairSystem(events);
     this.projectiles = new ProjectileSystem(events, this.nav);
     this.rebuildNav();
     this.spawnStartingUnits();
@@ -75,6 +79,7 @@ export class Game {
     this.construction.update(this.state, dt);
     this.production.update(this.state, dt);
     this.hero.update(this.state, dt);
+    this.repair.update(this.state, dt);
     this.combat.update(this.state, this.visibility, dt);
     this.projectiles.update(this.state, dt);
     this.movement.update(this.state, dt);
@@ -292,8 +297,38 @@ export class Game {
         this.hero.tryRally(this.state, command.faction ?? "player");
         break;
       }
+      case "REPAIR": {
+        const faction = command.faction ?? "player";
+        const building = this.state.players[faction].buildings.find(
+          (entry) =>
+            entry.id === command.buildingId &&
+            entry.state === "complete" &&
+            entry.hp < entry.maxHp,
+        );
+        if (!building) break;
+        const villagers = this.unitsOf(faction, command.unitIds).filter(
+          (unit) => unit.type === "villager",
+        );
+        if (villagers.length === 0) break;
+        this.movement.orderRepair(villagers, building);
+        this.events.emit("repair:started", building.id);
+        break;
+      }
       case "UPGRADE_HERO": {
         this.hero.upgradeHero(this.state, command.faction ?? "player");
+        break;
+      }
+      case "RESEARCH": {
+        const faction = command.faction ?? "player";
+        const player = this.state.players[faction];
+        const research = RESEARCH[command.line];
+        const level = player.research[command.line] ?? 0;
+        if (level >= research.tiers.length) break;
+        const cost = research.tiers[level].cost;
+        if (!canAfford(player.resources, cost)) break;
+        spendCost(player.resources, cost);
+        player.research[command.line] = level + 1;
+        this.events.emit("research:done", command.line);
         break;
       }
     }

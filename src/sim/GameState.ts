@@ -64,6 +64,7 @@ export function spawnUnit(
     state: "idle",
     path: [],
     assignedBuildingId: undefined,
+    repairBuildingId: undefined,
     targetKind: undefined,
     targetId: undefined,
     attackTimer: 0,
@@ -81,6 +82,7 @@ function createPlayer(id: PlayerId): PlayerState {
     resources: { ...STARTING_RESOURCES },
     buildings: [],
     units: [],
+    research: { farming: 0, lumber: 0, mining: 0 },
   };
 }
 

@@ -16,6 +16,7 @@ export type BuildingType =
   | "army_camp"
   | "tower"
   | "wall"
+  | "academy"
   | "forest"
   | "gold_vein";
 
@@ -53,7 +54,7 @@ export type UnitType =
   | "horse_rider"
   | "hero";
 
-export type UnitState = "idle" | "moving" | "gathering" | "attacking" | "dead";
+export type UnitState = "idle" | "moving" | "gathering" | "attacking" | "repairing" | "dead";
 
 export interface Unit {
   id: string;
@@ -66,6 +67,7 @@ export interface Unit {
   state: UnitState;
   path: Array<{ x: number; y: number }>;
   assignedBuildingId?: string;
+  repairBuildingId?: string;
   targetKind?: "unit" | "building";
   targetId?: string;
   attackTimer: number;
@@ -87,12 +89,15 @@ export interface Projectile {
   targetId: string;
 }
 
+import type { ResearchLine } from "../config/research";
+
 export interface PlayerState {
   id: PlayerId;
   resources: ResourceStore;
   buildings: Building[];
   units: Unit[];
   heroId?: string;
+  research: Record<ResearchLine, number>;
 }
 
 export interface UiState {

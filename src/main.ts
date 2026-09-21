@@ -23,6 +23,7 @@ import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
 import { OutcomeOverlay } from "./ui/OutcomeOverlay";
+import { SoundFX } from "./audio/sfx";
 
 function placementOrigin(type: BuildingType, tile: { x: number; y: number }) {
   const definition = def(type);
@@ -78,7 +79,14 @@ async function main(): Promise<void> {
   const fog = new FogRenderer(fogLayer, GRID_COLS, GRID_ROWS);
   const ghost = new PlacementGhost(ghostLayer);
   const selectionBox = new SelectionBox(screenLayer);
-  const hud = new Hud(hudTop);
+  const sfx = new SoundFX();
+  const hud = new Hud(hudTop, {
+    isSoundOn: () => sfx.isEnabled(),
+    onToggleSound: () => {
+      sfx.toggle();
+      sfx.play("click");
+    },
+  });
   const commandPanel = new CommandPanel(hudBottom, (command) => game.execute(command));
   const outcome = new OutcomeOverlay(document.body, () => window.location.reload());
 
@@ -222,15 +230,21 @@ async function main(): Promise<void> {
 
     const target = buildingAtTile(game.state.players.player, tile.x, tile.y);
 
-    if (target && def(target.type).maxWorkers) {
+    if (target) {
       const villagers = selectedIds.filter((id) => {
         const unit = game.state.players.player.units.find((entry) => entry.id === id);
         return unit && unit.type === "villager" && unit.state !== "dead";
       });
-      if (villagers.length > 0) {
+      if (villagers.length === 0) return;
+      if (target.hp < target.maxHp) {
+        game.execute({ type: "REPAIR", unitIds: villagers, buildingId: target.id });
+        return;
+      }
+      if (def(target.type).maxWorkers) {
         game.execute({ type: "ASSIGN_WORKERS", unitIds: villagers, buildingId: target.id });
         return;
       }
+      return;
     }
 
     game.execute({ type: "MOVE_UNITS", unitIds: selectedIds, x: worldPoint.x, y: worldPoint.y });
@@ -258,11 +272,37 @@ async function main(): Promise<void> {
       if (code === "Digit1") loop.timeScale = 1;
       if (code === "Digit2") loop.timeScale = 2;
       if (code === "Digit3") loop.timeScale = 3;
+      if (code === "KeyM") {
+        sfx.toggle();
+        sfx.play("click");
+      }
     },
   });
 
   events.on<string>("placement:rejected", (reason) => {
     console.debug("[rts] placement rejected:", reason);
+    sfx.play("error");
+  });
+
+  events.on("building:created", () => sfx.play("place"));
+  events.on("building:completed", () => sfx.play("complete"));
+  events.on("building:destroyed", () => sfx.play("destroyed"));
+  events.on("building:repaired", () => sfx.play("complete"));
+  events.on("unit:created", () => sfx.play("train"));
+  events.on("unit:died", () => sfx.play("die"));
+  events.on("projectile:hit", () => sfx.play("hit"));
+  events.on("train:queued", () => sfx.play("click"));
+  events.on("repair:started", () => sfx.play("repair"));
+  events.on("hero:rally", () => sfx.play("rally"));
+  events.on("hero:upgraded", () => sfx.play("upgrade"));
+  events.on("hero:respawned", () => sfx.play("train"));
+  events.on("research:done", () => sfx.play("upgrade"));
+  events.on("victory", () => sfx.play("victory"));
+  events.on("defeat", () => sfx.play("defeat"));
+  events.on<string>("combat:strike", (kind) => {
+    if (kind === "tower") sfx.play("tower");
+    else if (kind === "ranged") sfx.play("bolt");
+    else sfx.play("melee");
   });
 
   if (import.meta.env.DEV) {

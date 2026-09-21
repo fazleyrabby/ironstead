@@ -1,3 +1,4 @@
+import type { ResearchLine } from "../config/research";
 import type { BuildingType, PlayerId, UnitType } from "./types";
 
 export type Command =
@@ -22,5 +23,7 @@ export type Command =
       faction?: PlayerId;
     }
   | { type: "ASSIGN_WORKERS"; unitIds: string[]; buildingId: string; faction?: PlayerId }
+  | { type: "REPAIR"; unitIds: string[]; buildingId: string; faction?: PlayerId }
+  | { type: "RESEARCH"; line: ResearchLine; faction?: PlayerId }
   | { type: "ACTIVATE_HERO"; faction?: PlayerId }
   | { type: "UPGRADE_HERO"; faction?: PlayerId };

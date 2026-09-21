@@ -15,6 +15,7 @@ export interface UnitDefinition {
   color: number;
   radius: number;
   sight: number;
+  regen: number;
   aggressive: boolean;
   ranged: boolean;
 }
@@ -35,6 +36,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     radius: 9,
     aggressive: false,
     ranged: false,
+    regen: 2,
   },
   swordsman: {
     id: "swordsman",
@@ -48,6 +50,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     productionTime: 10,
     color: 0x7aa2f7,
     sight: 8,
+    regen: 1.5,
     radius: 10,
     aggressive: true,
     ranged: false,
@@ -65,6 +68,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     counters: ["horse_rider"],
     color: 0x7ee081,
     sight: 8,
+    regen: 1.5,
     radius: 10,
     aggressive: true,
     ranged: false,
@@ -81,6 +85,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     productionTime: 12,
     color: 0xc792ea,
     sight: 9,
+    regen: 1.5,
     radius: 10,
     aggressive: true,
     ranged: true,
@@ -97,6 +102,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     productionTime: 14,
     color: 0xcb8a4b,
     sight: 9,
+    regen: 2,
     radius: 12,
     aggressive: true,
     ranged: false,
@@ -116,6 +122,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     radius: 13,
     aggressive: true,
     ranged: false,
+    regen: 3,
   },
 };
 

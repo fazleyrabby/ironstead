@@ -31,6 +31,7 @@ export class CombatSystem {
   ): void {
     for (const unit of units) {
       unit.assignedBuildingId = undefined;
+      unit.repairBuildingId = undefined;
       unit.targetKind = targetKind;
       unit.targetId = targetId;
       unit.attackTimer = 0;
@@ -54,6 +55,13 @@ export class CombatSystem {
       const foe: PlayerId = id === "player" ? "enemy" : "player";
       for (const unit of state.players[id].units) {
         if (unit.state === "dead") continue;
+
+        if (
+          (unit.state === "idle" || unit.state === "gathering") &&
+          unit.hp < unit.maxHp
+        ) {
+          unit.hp = Math.min(unit.maxHp, unit.hp + unitDef(unit.type).regen * dt);
+        }
 
         if (unit.targetId && !this.resolveTarget(state, id, unit)) {
           unit.targetId = undefined;
@@ -132,6 +140,7 @@ export class CombatSystem {
         if (!enemy) continue;
 
         building.cooldown = attack.cooldown;
+        this.events.emit("combat:strike", "tower");
         state.projectiles.push({
           id: `p${state.nextId++}`,
           owner: id,
@@ -152,6 +161,7 @@ export class CombatSystem {
     if (target.kind === "unit" && definition.counters?.includes(target.unit.type)) {
       damage *= 1.5;
     }
+    this.events.emit("combat:strike", definition.ranged ? "ranged" : "melee");
 
     if (definition.ranged) {
       state.projectiles.push({

@@ -13,14 +13,14 @@ export class MovementSystem {
     this.nav = nav;
   }
 
-  orderMove(units: Unit[], destX: number, destY: number): void {
-    const count = units.length;
+  orderMove(units: Unit[], destX: number, destY: number): void {    const count = units.length;
     if (count === 0) return;
     const cols = Math.ceil(Math.sqrt(count));
     const rows = Math.ceil(count / cols);
 
     units.forEach((unit, index) => {
       unit.assignedBuildingId = undefined;
+      unit.repairBuildingId = undefined;
       unit.targetKind = undefined;
       unit.targetId = undefined;
       const col = index % cols;
@@ -34,6 +34,20 @@ export class MovementSystem {
   orderAssign(units: Unit[], building: Building): void {
     units.forEach((unit, index) => {
       unit.assignedBuildingId = building.id;
+      unit.repairBuildingId = undefined;
+      unit.targetKind = undefined;
+      unit.targetId = undefined;
+      const angle = (index / Math.max(units.length, 1)) * Math.PI * 2;
+      const reachX = building.width / 2 + 24;
+      const reachY = building.height / 2 + 24;
+      this.sendUnit(unit, building.x + Math.cos(angle) * reachX, building.y + Math.sin(angle) * reachY);
+    });
+  }
+
+  orderRepair(units: Unit[], building: Building): void {
+    units.forEach((unit, index) => {
+      unit.repairBuildingId = building.id;
+      unit.assignedBuildingId = undefined;
       unit.targetKind = undefined;
       unit.targetId = undefined;
       const angle = (index / Math.max(units.length, 1)) * Math.PI * 2;
@@ -59,7 +73,11 @@ export class MovementSystem {
 
     const tiles = findPath(this.nav, start, goal);
     unit.path = tiles.map((tile) => tileToWorldCenter(tile.x, tile.y));
-    unit.state = unit.path.length > 0 ? "moving" : unit.assignedBuildingId ? "gathering" : "idle";
+    if (unit.path.length === 0) {
+      unit.state = unit.repairBuildingId ? "repairing" : unit.assignedBuildingId ? "gathering" : "idle";
+    } else {
+      unit.state = "moving";
+    }
   }
 
   update(state: GameState, dt: number): void {
@@ -67,7 +85,11 @@ export class MovementSystem {
       for (const unit of state.players[id].units) {
         if (unit.state !== "moving") continue;
         if (unit.path.length === 0) {
-          unit.state = unit.assignedBuildingId ? "gathering" : "idle";
+          unit.state = unit.repairBuildingId
+            ? "repairing"
+            : unit.assignedBuildingId
+              ? "gathering"
+              : "idle";
           continue;
         }
 
@@ -92,7 +114,11 @@ export class MovementSystem {
         }
 
         if (unit.path.length === 0) {
-          unit.state = unit.assignedBuildingId ? "gathering" : "idle";
+          unit.state = unit.repairBuildingId
+            ? "repairing"
+            : unit.assignedBuildingId
+              ? "gathering"
+              : "idle";
         }
       }
     }

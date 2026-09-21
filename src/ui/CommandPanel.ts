@@ -1,5 +1,7 @@
 import { BUILDABLE_TYPES, BUILDING_ICONS, BUILDINGS } from "../config/buildings";
 import { HERO } from "../config/hero";
+import { RESEARCH, RESEARCH_LINES } from "../config/research";
+import type { ResearchLine } from "../config/research";
 import { RESOURCE_ICONS } from "../config/resources";
 import { UNIT_ICONS } from "../config/units";
 import { findBuilding } from "../sim/Game";
@@ -81,6 +83,12 @@ export class CommandPanel {
       return;
     }
 
+    const researchButton = target.closest<HTMLElement>("[data-research]");
+    if (researchButton?.dataset.research) {
+      this.execute({ type: "RESEARCH", line: researchButton.dataset.research as ResearchLine });
+      return;
+    }
+
     const action = target.closest<HTMLElement>("[data-action]")?.dataset.action;
     if (action === "cancel") {
       this.execute({ type: "CANCEL_PLACEMENT" });
@@ -117,6 +125,7 @@ export class CommandPanel {
       selected ? selected.queue.map((order) => `${order.unitType}:${Math.floor(order.progress * 10)}`).join(",") : "",
       state.ui.selectedUnitIds.join(","),
       hero ? `h${hero.heroLevel ?? 1}:${Math.ceil(hero.abilityCooldown)}` : "",
+      RESEARCH_LINES.map((line) => player.research[line] ?? 0).join(","),
       state.status,
       Math.floor(player.resources.food),
       Math.floor(player.resources.wood),
@@ -163,7 +172,7 @@ export class CommandPanel {
     const heroSelected = units.some((unit) => unit.type === "hero");
 
     const hint = hasVillager
-      ? "Right-click ground to move &middot; right-click a farm, forest or mine to work it"
+      ? "Right-click ground to move &middot; right-click a farm, forest or mine to work it &middot; right-click damaged buildings to repair"
       : "Right-click ground to move";
 
     let heroBlock = "";
@@ -198,12 +207,14 @@ export class CommandPanel {
     const stats = statsLabel(state, building);
     const production = this.productionHtml(state, building);
     const heroUpgrade = this.heroUpgradeHtml(state, building);
+    const research = this.researchHtml(state, building);
 
     return `
       <div class="panel">
         <div class="panel-head">${BUILDING_ICONS[building.type]} ${definition.name}</div>
         <div class="panel-desc">${definition.description}</div>
         ${heroUpgrade}
+        ${research}
         ${production}
         <div class="hpbar"><i style="width:${(hpRatio * 100).toFixed(1)}%"></i></div>
         <div class="panel-hint">HP ${Math.ceil(building.hp)} / ${building.maxHp}${
@@ -237,6 +248,33 @@ export class CommandPanel {
           <span class="bb-cost">${costLabel(cost)}</span>
         </button>
       </div>`;
+  }
+
+  private researchHtml(state: GameState, building: Building): string {
+    if (building.type !== "academy" || building.state !== "complete") return "";
+    const player = state.players.player;
+
+    const buttons = RESEARCH_LINES.map((line) => {
+      const research = RESEARCH[line];
+      const level = player.research[line] ?? 0;
+      const maxed = level >= research.tiers.length;
+      const tier = maxed ? undefined : research.tiers[level];
+      const affordable = tier !== undefined && canAfford(player.resources, tier.cost);
+      const pips = `${"\u25CF".repeat(level)}${"\u25CB".repeat(research.tiers.length - level)}`;
+      const costText = maxed || !tier ? `MAX ${pips}` : `${costLabel(tier.cost)} ${pips}`;
+      return `
+        <button class="build-btn${affordable ? "" : " is-disabled"}" data-research="${line}" ${
+          affordable ? "" : "disabled"
+        }>
+          <span class="bb-icon">${research.icon}</span>
+          <span class="bb-name">${research.name}</span>
+          <span class="bb-cost">${costText}</span>
+        </button>`;
+    }).join("");
+
+    return `
+      <div class="panel-sub">RESEARCH</div>
+      <div class="build-grid">${buttons}</div>`;
   }
 
   private productionHtml(state: GameState, building: Building): string {

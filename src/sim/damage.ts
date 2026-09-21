@@ -49,6 +49,10 @@ export function damageBuilding(
     for (const id of ["player", "enemy"] as const) {
       for (const unit of state.players[id].units) {
         if (unit.assignedBuildingId === building.id) unit.assignedBuildingId = undefined;
+        if (unit.repairBuildingId === building.id) {
+          unit.repairBuildingId = undefined;
+          if (unit.state === "repairing") unit.state = "idle";
+        }
       }
     }
 

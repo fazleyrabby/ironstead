@@ -212,6 +212,9 @@ function drawBody(g: Graphics, building: Building): void {
     case "wall":
       drawWall(g, building);
       break;
+    case "academy":
+      drawAcademy(g, building, faction);
+      break;
     case "forest":
       drawForest(g, building);
       break;
@@ -485,8 +488,45 @@ function drawTower(g: Graphics, building: Building, faction: number): void {
   g.poly([1.5, -h * 0.48 - 16, 1.5 + w * 0.3, -h * 0.48 - 12, 1.5, -h * 0.48 - 8]).fill(faction);
 }
 
-function drawWall(g: Graphics, building: Building): void {
+function drawAcademy(g: Graphics, building: Building, faction: number): void {
   const w = building.width;
+  const h = building.height;
+  const colors = def(building.type).colors;
+  const lw = line(w);
+  shadow(g, w, h);
+  foundation(g, w * 0.94, h * 0.94, lw);
+
+  const hallW = w * 0.72;
+  const hallH = h * 0.42;
+  const hallY = h * 0.0;
+  timberWall(g, -hallW / 2, hallY, hallW, hallH, colors.body, lw);
+
+  for (let i = 0; i < 4; i += 1) {
+    const cx = -hallW / 2 + (i + 0.5) * (hallW / 4);
+    g.roundRect(cx - w * 0.045, hallY - h * 0.02, w * 0.09, hallH + h * 0.04, 3).fill(colors.accent);
+    g.roundRect(cx - w * 0.045, hallY - h * 0.02, w * 0.09, hallH + h * 0.04, 3).stroke({
+      width: 1.5,
+      color: OUTLINE,
+      alpha: 0.9,
+    });
+  }
+
+  g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).fill(colors.roof);
+  g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).stroke({
+    width: lw,
+    color: OUTLINE,
+    alpha: 0.9,
+  });
+  g.circle(0, hallY - h * 0.1, w * 0.055).fill(colors.accent);
+  g.circle(0, hallY - h * 0.1, w * 0.055).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
+
+  door(g, 0, hallY + hallH, w * 0.15, h * 0.22);
+  windowLit(g, -hallW * 0.32, hallY + hallH * 0.55, w * 0.08);
+  windowLit(g, hallW * 0.32, hallY + hallH * 0.55, w * 0.08);
+  pennant(g, hallW / 2 - 2, hallY - h * 0.26 + 2, w * 0.13, faction);
+}
+
+function drawWall(g: Graphics, building: Building): void {  const w = building.width;
   const h = building.height;
   const colors = def(building.type).colors;
   const lw = line(w);

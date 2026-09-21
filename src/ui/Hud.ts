@@ -13,14 +13,22 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+export interface HudOptions {
+  isSoundOn?: () => boolean;
+  onToggleSound?: () => void;
+}
+
 export class Hud {
   private readonly values = new Map<ResourceType, HTMLElement>();
   private readonly popValue: HTMLElement;
   private readonly popCap: HTMLElement;
   private readonly clock: HTMLElement;
   private readonly speed: HTMLElement;
+  private readonly sound: HTMLElement;
+  private readonly options: HudOptions;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, options: HudOptions = {}) {
+    this.options = options;
     const title = el("div", "hud-title", "BROWSER RTS");
     const resources = el("div", "hud-res");
 
@@ -43,8 +51,11 @@ export class Hud {
 
     this.clock = el("div", "hud-pill hud-clock", "0:00");
     this.speed = el("div", "hud-pill hud-speed", "1x");
+    this.sound = el("button", "hud-pill hud-sound", "\u{1F50A}");
+    this.sound.title = "Toggle sound (M)";
+    this.sound.addEventListener("click", () => this.options.onToggleSound?.());
 
-    parent.append(title, el("div", "hud-spacer"), resources, pop, this.clock, this.speed);
+    parent.append(title, el("div", "hud-spacer"), resources, pop, this.clock, this.speed, this.sound);
   }
 
   update(state: GameState, timeScale = 1): void {
@@ -69,5 +80,8 @@ export class Hud {
 
     const speedLabel = timeScale === 0 ? "Paused" : `${timeScale}x`;
     if (this.speed.textContent !== speedLabel) this.speed.textContent = speedLabel;
+
+    const soundLabel = this.options.isSoundOn?.() === false ? "\u{1F507}" : "\u{1F50A}";
+    if (this.sound.textContent !== soundLabel) this.sound.textContent = soundLabel;
   }
 }
