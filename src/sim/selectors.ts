@@ -82,7 +82,7 @@ export function productionResource(building: Building): ResourceType | undefined
 export function unitCount(player: PlayerState): number {
   let count = 0;
   for (const unit of player.units) {
-    if (unit.state !== "dead") count += 1;
+    if (unit.state !== "dead" && unit.type !== "hero") count += 1;
   }
   return count;
 }

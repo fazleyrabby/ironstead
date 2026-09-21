@@ -6,6 +6,7 @@ import { findPath, nearestFreeTile, tileToWorldCenter } from "../pathfinding";
 import type { NavGrid } from "../navgrid";
 import { isTileVisible } from "../visibility";
 import type { VisibilityMap } from "../visibility";
+import { heroAttack } from "./HeroSystem";
 import type { Building, GameState, PlayerId, Unit } from "../types";
 
 const AGGRO_RANGE = 220;
@@ -89,7 +90,7 @@ export class CombatSystem {
         if (dist <= definition.range) {
           unit.state = "attacking";
           unit.path = [];
-          unit.attackTimer -= dt;
+          unit.attackTimer -= dt * (unit.rallyTimer > 0 ? 1.2 : 1);
           if (unit.attackTimer <= 0) {
             unit.attackTimer = definition.attackCooldown;
             this.strike(state, unit, target);
@@ -147,7 +148,7 @@ export class CombatSystem {
 
   private strike(state: GameState, attacker: Unit, target: Target): void {
     const definition = unitDef(attacker.type);
-    let damage = definition.damage;
+    let damage = attacker.type === "hero" ? heroAttack(attacker) : definition.damage;
     if (target.kind === "unit" && definition.counters?.includes(target.unit.type)) {
       damage *= 1.5;
     }

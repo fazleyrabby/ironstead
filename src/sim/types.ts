@@ -45,7 +45,13 @@ export interface Building {
   cooldown: number;
 }
 
-export type UnitType = "villager" | "swordsman" | "spearman" | "crossbowman" | "horse_rider";
+export type UnitType =
+  | "villager"
+  | "swordsman"
+  | "spearman"
+  | "crossbowman"
+  | "horse_rider"
+  | "hero";
 
 export type UnitState = "idle" | "moving" | "gathering" | "attacking" | "dead";
 
@@ -64,6 +70,10 @@ export interface Unit {
   targetId?: string;
   attackTimer: number;
   repathTimer: number;
+  heroLevel?: number;
+  abilityCooldown: number;
+  rallyTimer: number;
+  respawnTimer: number;
 }
 
 export interface Projectile {
@@ -82,6 +92,7 @@ export interface PlayerState {
   resources: ResourceStore;
   buildings: Building[];
   units: Unit[];
+  heroId?: string;
 }
 
 export interface UiState {

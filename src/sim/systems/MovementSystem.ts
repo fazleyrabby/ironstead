@@ -71,7 +71,7 @@ export class MovementSystem {
           continue;
         }
 
-        const speed = UNITS[unit.type].speed;
+        const speed = UNITS[unit.type].speed * (unit.rallyTimer > 0 ? 1.2 : 1);
         let remaining = speed * dt;
 
         while (remaining > 0 && unit.path.length > 0) {

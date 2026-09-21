@@ -21,4 +21,6 @@ export type Command =
       targetId: string;
       faction?: PlayerId;
     }
-  | { type: "ASSIGN_WORKERS"; unitIds: string[]; buildingId: string; faction?: PlayerId };
+  | { type: "ASSIGN_WORKERS"; unitIds: string[]; buildingId: string; faction?: PlayerId }
+  | { type: "ACTIVATE_HERO"; faction?: PlayerId }
+  | { type: "UPGRADE_HERO"; faction?: PlayerId };

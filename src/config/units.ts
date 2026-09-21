@@ -101,6 +101,22 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     aggressive: true,
     ranged: false,
   },
+  hero: {
+    id: "hero",
+    name: "Hero",
+    cost: {},
+    hp: 600,
+    damage: 50,
+    range: 40,
+    speed: 80,
+    attackCooldown: 1.0,
+    productionTime: 0,
+    color: 0xf2c14e,
+    sight: 9,
+    radius: 13,
+    aggressive: true,
+    ranged: false,
+  },
 };
 
 export const UNIT_ICONS: Record<UnitType, string> = {
@@ -109,4 +125,5 @@ export const UNIT_ICONS: Record<UnitType, string> = {
   spearman: "\u{1F6E1}\uFE0F",
   crossbowman: "\u{1F3F9}",
   horse_rider: "\u{1F40E}",
+  hero: "\u{1F451}",
 };

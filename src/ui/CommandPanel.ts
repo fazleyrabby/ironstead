@@ -1,4 +1,5 @@
 import { BUILDABLE_TYPES, BUILDING_ICONS, BUILDINGS } from "../config/buildings";
+import { HERO } from "../config/hero";
 import { RESOURCE_ICONS } from "../config/resources";
 import { UNIT_ICONS } from "../config/units";
 import { findBuilding } from "../sim/Game";
@@ -12,6 +13,7 @@ import {
   unitCount,
   unitDef,
 } from "../sim/selectors";
+import { heroDisplayName, heroIcon } from "../sim/systems/HeroSystem";
 import type { Command } from "../sim/commands";
 import type { Building, BuildingType, GameState, ResourceStore, Unit, UnitType } from "../sim/types";
 
@@ -84,6 +86,14 @@ export class CommandPanel {
       this.execute({ type: "CANCEL_PLACEMENT" });
       return;
     }
+    if (action === "rally") {
+      this.execute({ type: "ACTIVATE_HERO" });
+      return;
+    }
+    if (action === "upgrade-hero") {
+      this.execute({ type: "UPGRADE_HERO" });
+      return;
+    }
     if (action === "deselect") {
       this.execute({ type: "SELECT_BUILDING" });
       this.execute({ type: "SELECT_UNITS", unitIds: [] });
@@ -97,6 +107,8 @@ export class CommandPanel {
       .map((id) => player.units.find((unit) => unit.id === id && unit.state !== "dead"))
       .filter((unit): unit is Unit => unit !== undefined);
 
+    const hero = player.units.find((unit) => unit.type === "hero");
+
     const signature = [
       state.ui.pendingBuild ?? "",
       selected?.id ?? "",
@@ -104,6 +116,7 @@ export class CommandPanel {
       selected ? selected.state : "",
       selected ? selected.queue.map((order) => `${order.unitType}:${Math.floor(order.progress * 10)}`).join(",") : "",
       state.ui.selectedUnitIds.join(","),
+      hero ? `h${hero.heroLevel ?? 1}:${Math.ceil(hero.abilityCooldown)}` : "",
       state.status,
       Math.floor(player.resources.food),
       Math.floor(player.resources.wood),
@@ -122,7 +135,7 @@ export class CommandPanel {
       return;
     }
     if (selectedUnits.length > 0) {
-      this.root.innerHTML = this.unitsHtml(selectedUnits);
+      this.root.innerHTML = this.unitsHtml(selectedUnits, state);
       return;
     }
     if (selected) {
@@ -142,15 +155,38 @@ export class CommandPanel {
       </div>`;
   }
 
-  private unitsHtml(units: Unit[]): string {
+  private unitsHtml(units: Unit[], state: GameState): string {
     const hasVillager = units.some((unit) => unit.type === "villager");
+    const hero = state.players.player.units.find(
+      (unit) => unit.type === "hero" && unit.state !== "dead",
+    );
+    const heroSelected = units.some((unit) => unit.type === "hero");
+
     const hint = hasVillager
       ? "Right-click ground to move &middot; right-click a farm, forest or mine to work it"
       : "Right-click ground to move";
+
+    let heroBlock = "";
+    if (heroSelected && hero) {
+      const ready = hero.abilityCooldown <= 0;
+      const name = heroDisplayName(hero);
+      const cd = ready ? "Ready" : `${Math.ceil(hero.abilityCooldown)}s`;
+      heroBlock = `
+        <div class="panel-sub">${heroIcon(hero)} ${name} &middot; Level ${hero.heroLevel ?? 1}</div>
+        <button class="hero-ability${ready ? "" : " is-cooling"}" data-action="rally" ${
+          ready ? "" : "disabled"
+        }>
+          <span class="ha-icon">${HERO.ability.name === "Rally" ? "\u{1F4E3}" : "\u2728"}</span>
+          <span class="ha-label">${HERO.ability.name}</span>
+          <span class="ha-cd">${cd}</span>
+        </button>`;
+    }
+
     return `
       <div class="panel">
         <div class="panel-head">${units.length} UNIT${units.length === 1 ? "" : "S"} SELECTED</div>
         <div class="panel-stats">${unitBreakdown(units)}</div>
+        ${heroBlock}
         <div class="panel-hint">${hint}</div>
         <button class="btn btn-ghost" data-action="deselect">Deselect</button>
       </div>`;
@@ -161,11 +197,13 @@ export class CommandPanel {
     const hpRatio = Math.max(0, Math.min(1, building.hp / building.maxHp));
     const stats = statsLabel(state, building);
     const production = this.productionHtml(state, building);
+    const heroUpgrade = this.heroUpgradeHtml(state, building);
 
     return `
       <div class="panel">
         <div class="panel-head">${BUILDING_ICONS[building.type]} ${definition.name}</div>
         <div class="panel-desc">${definition.description}</div>
+        ${heroUpgrade}
         ${production}
         <div class="hpbar"><i style="width:${(hpRatio * 100).toFixed(1)}%"></i></div>
         <div class="panel-hint">HP ${Math.ceil(building.hp)} / ${building.maxHp}${
@@ -173,6 +211,31 @@ export class CommandPanel {
         }</div>
         ${stats ? `<div class="panel-stats">${stats}</div>` : ""}
         <button class="btn btn-ghost" data-action="deselect">Close</button>
+      </div>`;
+  }
+
+  private heroUpgradeHtml(state: GameState, building: Building): string {
+    if (building.type !== "town_center" || building.state !== "complete") return "";
+    const hero = state.players.player.units.find((unit) => unit.type === "hero");
+    if (!hero) return "";
+    const level = hero.heroLevel ?? 1;
+
+    if (level >= HERO.levels.length) {
+      return `<div class="panel-hint">${heroDisplayName(hero)} is fully upgraded.</div>`;
+    }
+
+    const cost = HERO.levels[level].upgradeCost;
+    const affordable = canAfford(state.players.player.resources, cost);
+    return `
+      <div class="panel-sub">HERO</div>
+      <div class="build-grid">
+        <button class="build-btn${affordable ? "" : " is-disabled"}" data-action="upgrade-hero" ${
+          affordable ? "" : "disabled"
+        }>
+          <span class="bb-icon">${heroIcon(hero)}</span>
+          <span class="bb-name">${heroDisplayName(hero)} → Lv.${level + 1}</span>
+          <span class="bb-cost">${costLabel(cost)}</span>
+        </button>
       </div>`;
   }
 

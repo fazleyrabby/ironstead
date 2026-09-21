@@ -18,6 +18,7 @@ export class Hud {
   private readonly popValue: HTMLElement;
   private readonly popCap: HTMLElement;
   private readonly clock: HTMLElement;
+  private readonly speed: HTMLElement;
 
   constructor(parent: HTMLElement) {
     const title = el("div", "hud-title", "BROWSER RTS");
@@ -41,11 +42,12 @@ export class Hud {
     pop.append(popIcon, this.popValue, this.popCap);
 
     this.clock = el("div", "hud-pill hud-clock", "0:00");
+    this.speed = el("div", "hud-pill hud-speed", "1x");
 
-    parent.append(title, el("div", "hud-spacer"), resources, pop, this.clock);
+    parent.append(title, el("div", "hud-spacer"), resources, pop, this.clock, this.speed);
   }
 
-  update(state: GameState): void {
+  update(state: GameState, timeScale = 1): void {
     const player = state.players.player;
 
     for (const type of RESOURCE_TYPES) {
@@ -64,5 +66,8 @@ export class Hud {
     const total = Math.floor(state.time);
     const clock = `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, "0")}`;
     if (this.clock.textContent !== clock) this.clock.textContent = clock;
+
+    const speedLabel = timeScale === 0 ? "Paused" : `${timeScale}x`;
+    if (this.speed.textContent !== speedLabel) this.speed.textContent = speedLabel;
   }
 }

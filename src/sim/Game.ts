@@ -13,9 +13,11 @@ import { ConstructionSystem } from "./systems/ConstructionSystem";
 import { AISystem } from "./systems/AISystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { EconomySystem } from "./systems/EconomySystem";
+import { HeroSystem } from "./systems/HeroSystem";
 import { MovementSystem } from "./systems/MovementSystem";
 import { ProductionSystem } from "./systems/ProductionSystem";
 import { ProjectileSystem } from "./systems/ProjectileSystem";
+import { HERO } from "../config/hero";
 import type { Building, BuildingType, GameState, PlayerId, Unit } from "./types";
 
 const STARTING_VILLAGERS = 4;
@@ -29,6 +31,7 @@ export class Game {
   readonly movement: MovementSystem;
   readonly production: ProductionSystem;
   readonly combat: CombatSystem;
+  readonly hero: HeroSystem;
 
   private readonly economy = new EconomySystem();
   private readonly construction: ConstructionSystem;
@@ -49,6 +52,7 @@ export class Game {
     this.movement = new MovementSystem(this.nav);
     this.production = new ProductionSystem(events, this.nav);
     this.combat = new CombatSystem(events, this.nav);
+    this.hero = new HeroSystem(events);
     this.projectiles = new ProjectileSystem(events, this.nav);
     this.rebuildNav();
     this.spawnStartingUnits();
@@ -70,6 +74,7 @@ export class Game {
     this.economy.update(this.state, dt);
     this.construction.update(this.state, dt);
     this.production.update(this.state, dt);
+    this.hero.update(this.state, dt);
     this.combat.update(this.state, this.visibility, dt);
     this.projectiles.update(this.state, dt);
     this.movement.update(this.state, dt);
@@ -148,6 +153,19 @@ export class Game {
           : { x: townCenter.x, y: townCenter.y };
         this.state.players[id].units.push(spawnUnit(this.state, id, "villager", point.x, point.y));
       }
+
+      const heroTileX = Math.floor((townCenter.x + townCenter.width / 2 + 40) / TILE_SIZE);
+      const heroTileY = Math.floor(townCenter.y / TILE_SIZE);
+      const heroFree = nearestFreeTile(this.nav, heroTileX, heroTileY, 12);
+      const heroPoint = heroFree
+        ? tileToWorldCenter(heroFree.x, heroFree.y)
+        : { x: townCenter.x, y: townCenter.y };
+      const hero = spawnUnit(this.state, id, "hero", heroPoint.x, heroPoint.y);
+      const heroStats = HERO.levels[0];
+      hero.hp = heroStats.hp;
+      hero.maxHp = heroStats.hp;
+      this.state.players[id].units.push(hero);
+      this.state.players[id].heroId = hero.id;
     }
   }
 
@@ -268,6 +286,14 @@ export class Game {
           .filter((unit) => unit.type === "villager")
           .slice(0, slots);
         this.movement.orderAssign(villagers, building);
+        break;
+      }
+      case "ACTIVATE_HERO": {
+        this.hero.tryRally(this.state, command.faction ?? "player");
+        break;
+      }
+      case "UPGRADE_HERO": {
+        this.hero.upgradeHero(this.state, command.faction ?? "player");
         break;
       }
     }

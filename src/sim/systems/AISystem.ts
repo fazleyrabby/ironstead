@@ -467,7 +467,7 @@ export class AISystem {
     if (state.time > AI.scoutStartTime && state.time - this.lastScout > AI.scoutInterval) {
       const scout =
         military.find((soldier) => soldier.type === "horse_rider" && soldier.state === "idle") ??
-        military.find((soldier) => soldier.state === "idle");
+        military.find((soldier) => soldier.type !== "hero" && soldier.state === "idle");
       if (scout) {
         this.lastScout = state.time;
         const offset = SCOUT_OFFSETS[Math.floor(state.time / AI.scoutInterval) % SCOUT_OFFSETS.length];

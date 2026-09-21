@@ -68,6 +68,10 @@ export function spawnUnit(
     targetId: undefined,
     attackTimer: 0,
     repathTimer: 0,
+    heroLevel: type === "hero" ? 1 : undefined,
+    abilityCooldown: 0,
+    rallyTimer: 0,
+    respawnTimer: 0,
   };
 }
 

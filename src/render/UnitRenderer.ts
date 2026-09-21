@@ -22,6 +22,7 @@ interface Entry {
   overlay: Graphics;
   selected: boolean;
   hpBucket: number;
+  rallyOn: boolean;
   lastX: number;
   facing: number;
 }
@@ -98,6 +99,7 @@ export class UnitRenderer {
       overlay,
       selected: false,
       hpBucket: -1,
+      rallyOn: false,
       lastX: unit.x,
       facing: 1,
     };
@@ -119,10 +121,12 @@ export class UnitRenderer {
     entry.body.scale.set(entry.facing * pulse, pulse);
 
     const hpBucket = Math.ceil((unit.hp / unit.maxHp) * 10);
-    if (entry.selected !== selected || entry.hpBucket !== hpBucket) {
+    const rallyOn = unit.rallyTimer > 0;
+    if (entry.selected !== selected || entry.hpBucket !== hpBucket || entry.rallyOn !== rallyOn) {
       entry.selected = selected;
       entry.hpBucket = hpBucket;
-      redrawOverlay(entry.overlay, unit, selected);
+      entry.rallyOn = rallyOn;
+      redrawOverlay(entry.overlay, unit, selected, rallyOn);
     }
   }
 }
@@ -151,6 +155,9 @@ function drawBody(g: Graphics, unit: Unit): void {
       break;
     case "horse_rider":
       drawHorse(g, radius, faction);
+      break;
+    case "hero":
+      drawHero(g, radius, faction);
       break;
   }
 }
@@ -262,13 +269,57 @@ function drawHorse(g: Graphics, r: number, faction: number): void {
   g.rect(r * 0.3, -r * 1.1, r * 0.12, r * 0.8).fill(STEEL);
 }
 
-function redrawOverlay(g: Graphics, unit: Unit, selected: boolean): void {
+function drawHero(g: Graphics, r: number, faction: number): void {
+  g.ellipse(0, r * 0.95, r * 1.2, r * 0.45).fill({ color: 0x000000, alpha: 0.22 });
+
+  g.poly([-r, r * 0.7, r, r * 0.7, 0, -r * 0.2]).fill(0x9b1c2e);
+  g.poly([-r, r * 0.7, r, r * 0.7, 0, -r * 0.2]).stroke({ width: 2, color: OUTLINE, alpha: 0.9 });
+
+  g.circle(0, 0, r).fill(0xf2c14e);
+  g.circle(0, 0, r).stroke({ width: 2.4, color: OUTLINE, alpha: 0.9 });
+
+  g.circle(0, -r * 0.25, r * 0.52).fill(SKIN);
+  g.poly([-r * 0.55, -r * 0.1, r * 0.55, -r * 0.1, 0, -r * 0.95]).fill(faction);
+  g.poly([-r * 0.55, -r * 0.1, r * 0.55, -r * 0.1, 0, -r * 0.95]).stroke({
+    width: 1.8,
+    color: OUTLINE,
+    alpha: 0.9,
+  });
+
+  g.rect(r * 0.5, -r * 0.75, r * 0.18, r * 1.15).fill(0xf6f1d6);
+  g.rect(r * 0.5, -r * 0.75, r * 0.18, r * 1.15).stroke({ width: 1.2, color: OUTLINE, alpha: 0.9 });
+  g.rect(r * 0.34, r * 0.15, r * 0.5, r * 0.14).fill(0x8a6a2f);
+
+  const crownY = -r * 0.92;
+  g.rect(-r * 0.42, crownY - r * 0.28, r * 0.84, r * 0.3).fill(0xf2c14e);
+  g.rect(-r * 0.42, crownY - r * 0.28, r * 0.84, r * 0.3).stroke({
+    width: 1.5,
+    color: OUTLINE,
+    alpha: 0.9,
+  });
+  for (const px of [-r * 0.36, 0, r * 0.36]) {
+    g.poly([px - r * 0.1, crownY - r * 0.28, px + r * 0.1, crownY - r * 0.28, px, crownY - r * 0.62]).fill(
+      0xf2c14e,
+    );
+  }
+  g.circle(0, crownY - r * 0.08, r * 0.09).fill(0x9b1c2e);
+}
+
+function redrawOverlay(g: Graphics, unit: Unit, selected: boolean, rallyOn: boolean): void {
   g.clear();
   const definition = unitDef(unit.type);
   const radius = definition.radius;
 
+  if (rallyOn) {
+    g.circle(0, 0, radius + 9).stroke({ width: 2, color: 0xf2c14e, alpha: 0.85 });
+  }
+
   if (selected) {
     g.circle(0, 0, radius + 6).stroke({ width: 2.5, color: 0x7ee081, alpha: 0.95 });
+  }
+
+  if (unit.type === "hero") {
+    g.circle(0, 0, radius + 12).stroke({ width: 1.5, color: 0xf2c14e, alpha: 0.4 });
   }
 
   if (selected || unit.hp < unit.maxHp) {

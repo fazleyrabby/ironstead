@@ -75,7 +75,7 @@ export class InputManager {
   };
 
   private readonly onPointerDown = (event: PointerEvent): void => {
-    const isPan = event.button === 1 || (event.button === 0 && this.keys.has("Space"));
+    const isPan = event.button === 1;
     if (isPan) {
       event.preventDefault();
       this.panning = true;

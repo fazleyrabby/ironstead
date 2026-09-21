@@ -249,6 +249,15 @@ async function main(): Promise<void> {
       if (code === "KeyC") {
         camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
       }
+      if (code === "KeyR") {
+        game.execute({ type: "ACTIVATE_HERO" });
+      }
+      if (code === "Space" && game.state.status === "playing") {
+        loop.timeScale = loop.timeScale === 0 ? 1 : 0;
+      }
+      if (code === "Digit1") loop.timeScale = 1;
+      if (code === "Digit2") loop.timeScale = 2;
+      if (code === "Digit3") loop.timeScale = 3;
     },
   });
 
@@ -298,7 +307,7 @@ async function main(): Promise<void> {
       projectileRenderer.update(game.state.projectiles);
       fog.update(game.visibility.player);
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
-      hud.update(game.state);
+      hud.update(game.state, loop.timeScale);
       commandPanel.update(game.state);
       outcome.update(game.state.status, game.state.stats, game.state.time);
       app.renderer.render(app.stage);
