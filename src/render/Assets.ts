@@ -8,7 +8,7 @@ export const UNIT_FRAMES = 6;
 
 // Blender sprite pipeline is wired up but parked: flip to true to render the
 // game with the exported sprites instead of the procedural Graphics art.
-export const USE_SPRITE_ASSETS: boolean = true;
+export const USE_SPRITE_ASSETS: boolean = false;
 
 const BUILDING_FILE: Record<BuildingType, (faction: SpriteFaction) => string> = {
   town_center: (f) => `tc_${f}`,

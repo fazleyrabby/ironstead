@@ -1,119 +1,142 @@
 {
   "buildings": {
-    "tc_blue": [
-      146,
-      168
-    ],
-    "tc_red": [
-      142,
-      162
-    ],
-    "house_blue": [
-      116,
-      135
-    ],
-    "house_red": [
-      145,
-      132
-    ],
-    "storage_blue": [
-      138,
-      142
-    ],
-    "storage_red": [
-      138,
-      142
-    ],
-    "army_camp_blue": [
-      157,
-      145
-    ],
-    "army_camp_red": [
-      157,
-      145
-    ],
-    "tower_blue": [
-      96,
-      168
-    ],
-    "tower_red": [
-      96,
-      168
-    ],
-    "academy_blue": [
-      142,
-      170
-    ],
-    "academy_red": [
-      142,
-      170
-    ],
-    "farm": [
-      141,
-      120
-    ],
-    "wall": [
-      149,
-      101
-    ],
-    "forest": [
-      127,
-      138
-    ],
-    "gold_vein": [
-      100,
-      121
-    ]
+    "tc_blue": {
+      "w": 174,
+      "h": 204
+    },
+    "tc_red": {
+      "w": 174,
+      "h": 204
+    },
+    "house_blue": {
+      "w": 186,
+      "h": 186
+    },
+    "house_red": {
+      "w": 186,
+      "h": 186
+    },
+    "storage_blue": {
+      "w": 198,
+      "h": 210
+    },
+    "storage_red": {
+      "w": 198,
+      "h": 210
+    },
+    "army_camp_blue": {
+      "w": 180,
+      "h": 142
+    },
+    "army_camp_red": {
+      "w": 180,
+      "h": 142
+    },
+    "tower_blue": {
+      "w": 96,
+      "h": 184
+    },
+    "tower_red": {
+      "w": 96,
+      "h": 184
+    },
+    "academy_blue": {
+      "w": 146,
+      "h": 172
+    },
+    "academy_red": {
+      "w": 146,
+      "h": 172
+    },
+    "farm": {
+      "w": 173,
+      "h": 136
+    },
+    "wall": {
+      "w": 142,
+      "h": 126
+    },
+    "forest": {
+      "w": 167,
+      "h": 138
+    },
+    "gold_vein": {
+      "w": 187,
+      "h": 123
+    }
   },
   "units": {
-    "villager_blue": [
-      74,
-      99
-    ],
-    "villager_red": [
-      72,
-      98
-    ],
-    "swordsman_blue": [
-      81,
-      111
-    ],
-    "swordsman_red": [
-      80,
-      109
-    ],
-    "spearman_blue": [
-      70,
-      128
-    ],
-    "spearman_red": [
-      71,
-      125
-    ],
-    "crossbowman_blue": [
-      90,
-      118
-    ],
-    "crossbowman_red": [
-      90,
-      116
-    ],
-    "horse_rider_blue": [
-      124,
-      143
-    ],
-    "horse_rider_red": [
-      125,
-      139
-    ],
-    "hero_blue": [
-      96,
-      135
-    ],
-    "hero_red": [
-      104,
-      123
-    ]
-  },
-  "source": "ironstead_assets"
+    "villager": {
+      "blue": {
+        "frames": 6,
+        "w": 67,
+        "h": 102
+      },
+      "red": {
+        "frames": 6,
+        "w": 67,
+        "h": 102
+      }
+    },
+    "swordsman": {
+      "blue": {
+        "frames": 6,
+        "w": 84,
+        "h": 111
+      },
+      "red": {
+        "frames": 6,
+        "w": 84,
+        "h": 111
+      }
+    },
+    "spearman": {
+      "blue": {
+        "frames": 6,
+        "w": 65,
+        "h": 88
+      },
+      "red": {
+        "frames": 6,
+        "w": 65,
+        "h": 88
+      }
+    },
+    "crossbowman": {
+      "blue": {
+        "frames": 6,
+        "w": 65,
+        "h": 84
+      },
+      "red": {
+        "frames": 6,
+        "w": 65,
+        "h": 84
+      }
+    },
+    "hero": {
+      "blue": {
+        "frames": 6,
+        "w": 56,
+        "h": 89
+      },
+      "red": {
+        "frames": 6,
+        "w": 56,
+        "h": 89
+      }
+    },
+    "horse_rider": {
+      "blue": {
+        "frames": 6,
+        "w": 100,
+        "h": 88
+      },
+      "red": {
+        "frames": 6,
+        "w": 100,
+        "h": 88
+      }
+    }
+  }
 }
