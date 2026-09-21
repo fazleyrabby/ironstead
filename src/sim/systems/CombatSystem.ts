@@ -1,4 +1,4 @@
-import { worldToTile } from "../../config/world";
+import { TILE_SIZE, worldToTile } from "../../config/world";
 import type { EventBus } from "../../core/EventBus";
 import { attackMultiplier, attackSpeedMultiplier } from "../../config/research";
 import { damageBuilding, damageUnit } from "../damage";
@@ -236,16 +236,44 @@ export class CombatSystem {
 
   private pathToTarget(unit: Unit, target: Target): Array<{ x: number; y: number }> {
     const start = worldToTile(unit.x, unit.y);
-    const goalTile =
-      target.kind === "unit"
-        ? worldToTile(target.unit.x, target.unit.y)
-        : worldToTile(target.building.x, target.building.y);
 
-    const goal = this.nav.isBlocked(goalTile.x, goalTile.y)
-      ? nearestFreeTile(this.nav, goalTile.x, goalTile.y, 10)
-      : goalTile;
+    if (target.kind === "unit") {
+      const goal = worldToTile(target.unit.x, target.unit.y);
+      const free = this.nav.isBlocked(goal.x, goal.y)
+        ? nearestFreeTile(this.nav, goal.x, goal.y, 8)
+        : goal;
+      if (!free) return [];
+      return findPath(this.nav, start, free).map((tile) => tileToWorldCenter(tile.x, tile.y));
+    }
+
+    // Building: aim for the point on its edge nearest this unit (pushed slightly
+    // out), so a group spreads around the building instead of all crowding one
+    // tile and jamming behind each other.
+    const b = target.building;
+    const halfW = b.width / 2;
+    const halfH = b.height / 2;
+    const nearX = Math.max(b.x - halfW, Math.min(unit.x, b.x + halfW));
+    const nearY = Math.max(b.y - halfH, Math.min(unit.y, b.y + halfH));
+    const dirX = unit.x - b.x;
+    const dirY = unit.y - b.y;
+    const len = Math.hypot(dirX, dirY) || 1;
+    const approachX = nearX + (dirX / len) * TILE_SIZE * 0.5;
+    const approachY = nearY + (dirY / len) * TILE_SIZE * 0.5;
+
+    const approachTile = worldToTile(approachX, approachY);
+    const goal = this.nav.isBlocked(approachTile.x, approachTile.y)
+      ? nearestFreeTile(this.nav, approachTile.x, approachTile.y, 6)
+      : approachTile;
     if (!goal) return [];
 
-    return findPath(this.nav, start, goal).map((tile) => tileToWorldCenter(tile.x, tile.y));
+    const path = findPath(this.nav, start, goal);
+    if (path.length > 0) return path.map((tile) => tileToWorldCenter(tile.x, tile.y));
+
+    // Fallback: the generic nearest free tile around the building centre.
+    const fallback = nearestFreeTile(this.nav, worldToTile(b.x, b.y).x, worldToTile(b.x, b.y).y, 10);
+    if (fallback && (fallback.x !== goal.x || fallback.y !== goal.y)) {
+      return findPath(this.nav, start, fallback).map((tile) => tileToWorldCenter(tile.x, tile.y));
+    }
+    return [];
   }
 }
