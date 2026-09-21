@@ -69,8 +69,19 @@ export class ProductionSystem {
     const free = nearestFreeTile(this.nav, centerTile.x, centerTile.y, 12);
     if (!free) return false;
 
-    const point = tileToWorldCenter(free.x, free.y);
-    const unit = spawnUnit(state, playerId, unitType, point.x, point.y);
+    const base = tileToWorldCenter(free.x, free.y);
+    const count = player.units.length;
+    const angle = count * 2.39996;
+    const ring = 26 + (count % 3) * 12;
+    let px = base.x + Math.cos(angle) * ring;
+    let py = base.y + Math.sin(angle) * ring;
+    const offsetTile = worldToTile(px, py);
+    if (this.nav.isBlocked(offsetTile.x, offsetTile.y)) {
+      px = base.x;
+      py = base.y;
+    }
+
+    const unit = spawnUnit(state, playerId, unitType, px, py);
     player.units.push(unit);
     this.events.emit("unit:created", unit);
     return true;

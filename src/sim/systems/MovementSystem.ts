@@ -1,5 +1,5 @@
 import { UNITS } from "../../config/units";
-import { WORLD_HEIGHT, WORLD_WIDTH, worldToTile } from "../../config/world";
+import { TILE_SIZE, WORLD_HEIGHT, WORLD_WIDTH, worldToTile } from "../../config/world";
 import { findPath, nearestFreeTile, tileToWorldCenter } from "../pathfinding";
 import type { NavGrid } from "../navgrid";
 import type { Building, GameState, Unit } from "../types";
@@ -117,18 +117,27 @@ export class MovementSystem {
         let dy = b.y - a.y;
         let dist = Math.hypot(dx, dy);
         if (dist < 0.01) {
-          dx = 1;
-          dy = 0;
+          const angle = ((i * 12.9898 + j * 78.233) * 43758.5453) % (Math.PI * 2);
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
           dist = 0.01;
         }
         if (dist < minDist) {
-          const push = (minDist - dist) / 2;
+          const push = ((minDist - dist) / 2) * 0.6;
           const nx = dx / dist;
           const ny = dy / dist;
-          a.x = clamp(a.x - nx * push, 0, WORLD_WIDTH);
-          a.y = clamp(a.y - ny * push, 0, WORLD_HEIGHT);
-          b.x = clamp(b.x + nx * push, 0, WORLD_WIDTH);
-          b.y = clamp(b.y + ny * push, 0, WORLD_HEIGHT);
+          const ax = clamp(a.x - nx * push, 0, WORLD_WIDTH);
+          const ay = clamp(a.y - ny * push, 0, WORLD_HEIGHT);
+          const bx = clamp(b.x + nx * push, 0, WORLD_WIDTH);
+          const by = clamp(b.y + ny * push, 0, WORLD_HEIGHT);
+          if (!this.nav.isBlocked(Math.floor(ax / TILE_SIZE), Math.floor(ay / TILE_SIZE))) {
+            a.x = ax;
+            a.y = ay;
+          }
+          if (!this.nav.isBlocked(Math.floor(bx / TILE_SIZE), Math.floor(by / TILE_SIZE))) {
+            b.x = bx;
+            b.y = by;
+          }
         }
       }
     }

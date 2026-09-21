@@ -3,6 +3,7 @@ import { MAP_LAYOUT } from "../../config/map";
 import { TILE_SIZE, worldToTile } from "../../config/world";
 import { canPlace } from "../placement";
 import { def, populationCap, storageCap, unitCount } from "../selectors";
+import { nearestFreeTile } from "../pathfinding";
 import { isTileVisible } from "../visibility";
 import type { Game } from "../Game";
 import type { Building, BuildingType, GameState, ResourceType, Unit } from "../types";
@@ -20,6 +21,7 @@ export class AISystem {
   private militaryTimer = 0;
   private buildCooldown = 0;
   private attacking = false;
+  private gathering = false;
   private lastScout = 0;
 
   update(game: Game, dt: number): void {
@@ -173,7 +175,7 @@ export class AISystem {
     if (count("army_camp") === 0 && time > AI.campBuildTime && res.wood >= 170) {
       if (this.tryBuild(game, "army_camp")) return;
     }
-    if (count("house") < AI.maxHouses && used >= cap - 1 && res.wood >= 70) {
+    if (count("house") < AI.maxHouses && cap - used <= 4 && res.wood >= 60) {
       if (this.tryBuild(game, "house")) return;
     }
     if (count("storage") < AI.maxStorages && maxRes > storageCap(enemy) - 150 && res.wood >= 120) {
@@ -187,9 +189,6 @@ export class AISystem {
     }
     if (count("farm") < 3 && time > 240 && res.wood >= 95) {
       if (this.tryBuild(game, "farm")) return;
-    }
-    if (cap - used < 4 && count("house") < AI.maxHouses && time > 300 && res.wood >= 70) {
-      if (this.tryBuild(game, "house")) return;
     }
     if (count("farm") < 4 && time > 420 && res.wood >= 95) {
       if (this.tryBuild(game, "farm")) return;
@@ -299,6 +298,13 @@ export class AISystem {
     return best;
   }
 
+  private rallyPoint(game: Game, townCenter: Building): { x: number; y: number } {
+    const goalTile = { x: townCenter.tileX + 2, y: townCenter.tileY + 8 };
+    const free = nearestFreeTile(game.nav, goalTile.x, goalTile.y, 14);
+    const tile = free ?? goalTile;
+    return { x: (tile.x + 0.5) * TILE_SIZE, y: (tile.y + 0.5) * TILE_SIZE };
+  }
+
   private runMilitary(game: Game, townCenter: Building): void {
     const state = game.state;
     const enemy = state.players.enemy;
@@ -342,8 +348,33 @@ export class AISystem {
     if (this.attacking) {
       if (military.length < AI.regroupBelow) {
         this.attacking = false;
+        this.gathering = false;
         return;
       }
+
+      if (this.gathering) {
+        const rally = this.rallyPoint(game, townCenter);
+        const grouped = military.filter(
+          (soldier) => Math.hypot(soldier.x - rally.x, soldier.y - rally.y) < TILE_SIZE * 4,
+        ).length;
+        const movers = military
+          .filter((soldier) => Math.hypot(soldier.x - rally.x, soldier.y - rally.y) >= TILE_SIZE * 4)
+          .map((soldier) => soldier.id);
+        if (movers.length > 0) {
+          game.execute({
+            type: "MOVE_UNITS",
+            faction: "enemy",
+            unitIds: movers,
+            x: rally.x,
+            y: rally.y,
+          });
+        }
+        if (grouped >= Math.max(AI.minAttackGroup, military.length * 0.75)) {
+          this.gathering = false;
+        }
+        return;
+      }
+
       const playerTc = state.players.player.buildings.find(
         (building) => building.type === "town_center" && building.state !== "destroyed",
       );
@@ -401,21 +432,34 @@ export class AISystem {
     }
 
     const idle = military.filter((soldier) => soldier.state === "idle" && !soldier.targetId);
-    if (
-      idle.length >= AI.minAttackGroup &&
-      (state.time > AI.firstAttackTime || idle.length >= AI.preferredAttackGroup)
-    ) {
-      const playerTc = state.players.player.buildings.find(
-        (building) => building.type === "town_center" && building.state !== "destroyed",
-      );
-      if (!playerTc) return;
-      this.attacking = true;
+
+    const rally = this.rallyPoint(game, townCenter);
+    const strays = idle.filter(
+      (soldier) => Math.hypot(soldier.x - rally.x, soldier.y - rally.y) > AI.rallyLeash * TILE_SIZE,
+    );
+    if (strays.length > 0) {
       game.execute({
-        type: "ATTACK_TARGET",
+        type: "MOVE_UNITS",
+        faction: "enemy",
+        unitIds: strays.map((soldier) => soldier.id),
+        x: rally.x,
+        y: rally.y,
+      });
+    }
+
+    const ready =
+      idle.length >= AI.minAttackGroup &&
+      (state.time > AI.firstAttackTime ||
+        (idle.length >= AI.preferredAttackGroup && state.time > AI.earlyAttackTime));
+    if (ready) {
+      this.attacking = true;
+      this.gathering = true;
+      game.execute({
+        type: "MOVE_UNITS",
         faction: "enemy",
         unitIds: idle.map((soldier) => soldier.id),
-        targetKind: "building",
-        targetId: playerTc.id,
+        x: rally.x,
+        y: rally.y,
       });
       return;
     }
