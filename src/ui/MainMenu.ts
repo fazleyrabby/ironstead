@@ -16,9 +16,11 @@ const CONTROLS: ControlRow[] = [
   { keys: "B", label: "Open the build menu" },
   { keys: "Esc", label: "Cancel placement or clear selection" },
   { keys: "Space", label: "Pause / resume" },
-  { keys: "1 / 2 / 3", label: "Game speed" },
+  { keys: "+ / \u2212", label: "Game speed" },
+  { keys: "1 \u2013 9", label: "Control groups (Ctrl+1\u20139 to set)" },
   { keys: "C", label: "Center on your Town Center" },
   { keys: "R", label: "Rally your hero" },
+  { keys: "T", label: "Test mode (AI auto-play)" },
   { keys: "M", label: "Mute sound" },
 ];
 

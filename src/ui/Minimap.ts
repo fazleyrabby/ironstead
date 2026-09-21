@@ -8,6 +8,7 @@ import type { GameState } from "../sim/types";
 
 export interface MinimapOptions {
   onNavigate: (worldX: number, worldY: number) => void;
+  onOrder?: (worldX: number, worldY: number) => void;
 }
 
 const WIDTH = 208;
@@ -50,6 +51,7 @@ export class Minimap {
     this.fog = document.createElement("canvas");
 
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
+    this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     window.addEventListener("pointermove", this.onPointerMove);
     window.addEventListener("pointerup", this.onPointerUp);
   }
@@ -166,6 +168,12 @@ export class Minimap {
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    if (event.button === 2) {
+      // right-click: issue a move/attack order at that world position
+      const world = this.toWorld(event);
+      this.options.onOrder?.(world.x, world.y);
+      return;
+    }
     this.dragging = true;
     try {
       this.canvas.setPointerCapture(event.pointerId);
@@ -184,9 +192,14 @@ export class Minimap {
   };
 
   private navigate(event: PointerEvent): void {
+    const world = this.toWorld(event);
+    this.options.onNavigate(world.x, world.y);
+  }
+
+  private toWorld(event: PointerEvent): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     const px = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
     const py = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-    this.options.onNavigate(px * WORLD_WIDTH, py * WORLD_HEIGHT);
+    return { x: px * WORLD_WIDTH, y: py * WORLD_HEIGHT };
   }
 }

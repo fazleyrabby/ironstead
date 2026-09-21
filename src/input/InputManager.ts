@@ -4,7 +4,7 @@ export interface InputCallbacks {
   onPrimaryClick?: (screenX: number, screenY: number) => void;
   onSecondaryClick?: (screenX: number, screenY: number) => void;
   onBoxSelect?: (x0: number, y0: number, x1: number, y1: number) => void;
-  onKeyDown?: (code: string) => void;
+  onKeyDown?: (code: string, event: KeyboardEvent) => void;
 }
 
 export interface DragBox {
@@ -49,7 +49,7 @@ export class InputManager {
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (!this.keys.has(event.code)) {
-      this.callbacks.onKeyDown?.(event.code);
+      this.callbacks.onKeyDown?.(event.code, event);
     }
     this.keys.add(event.code);
     this.camera.setPanKey(event.code, true);

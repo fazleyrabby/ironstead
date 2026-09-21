@@ -96,6 +96,7 @@ async function main(): Promise<void> {
   const outcome = new OutcomeOverlay(document.body, () => window.location.reload());
   const minimap = new Minimap(document.body, {
     onNavigate: (x, y) => camera.centerOn(x, y, camera.zoomLevel()),
+    onOrder: (x, y) => orderAtWorld({ x, y }),
   });
 
   let started = false;
@@ -167,6 +168,7 @@ async function main(): Promise<void> {
   const DOUBLE_CLICK_MS = 300;
   let lastClickAt = 0;
   let lastClickType: UnitType | undefined;
+  const controlGroups = new Map<string, string[]>();
 
   function handlePrimary(screenX: number, screenY: number): void {
     const worldPoint = camera.screenToWorld(screenX, screenY);
@@ -254,11 +256,12 @@ async function main(): Promise<void> {
       game.execute({ type: "CANCEL_PLACEMENT" });
       return;
     }
+    orderAtWorld(camera.screenToWorld(screenX, screenY));
+  }
 
+  function orderAtWorld(worldPoint: { x: number; y: number }): void {
     const selectedIds = game.state.ui.selectedUnitIds;
     if (selectedIds.length === 0) return;
-
-    const worldPoint = camera.screenToWorld(screenX, screenY);
 
     const enemyUnit = enemyUnitAtPoint(worldPoint.x, worldPoint.y);
     if (enemyUnit) {
@@ -309,8 +312,9 @@ async function main(): Promise<void> {
     onPrimaryClick: handlePrimary,
     onSecondaryClick: handleSecondary,
     onBoxSelect: handleBox,
-    onKeyDown: (code) => {
+    onKeyDown: (code, event) => {
       if (!started) return;
+      const mod = event.ctrlKey || event.metaKey;
       if (code === "Escape") {
         if (game.state.ui.pendingBuild) {
           game.execute({ type: "CANCEL_PLACEMENT" });
@@ -336,11 +340,31 @@ async function main(): Promise<void> {
       if (code === "Space" && game.state.status === "playing") {
         loop.timeScale = loop.timeScale === 0 ? 1 : 0;
       }
-      if (code === "Digit1") loop.timeScale = 1;
-      if (code === "Digit2") loop.timeScale = 2;
-      if (code === "Digit3") loop.timeScale = 3;
-      if (code === "Digit4") loop.timeScale = 4;
-      if (code === "Digit5") loop.timeScale = 5;
+      if (code === "Minus" || code === "NumpadSubtract") {
+        loop.timeScale = Math.max(1, loop.timeScale - 1);
+      }
+      if (code === "Equal" || code === "NumpadAdd") {
+        loop.timeScale = Math.min(5, loop.timeScale + 1);
+      }
+      // Control groups: Ctrl+1..9 assign, Shift+Ctrl add, 1..9 recall (AoE-style)
+      if (code.startsWith("Digit")) {
+        const n = code.slice(5);
+        if (mod) {
+          event.preventDefault();
+          const current = [...game.state.ui.selectedUnitIds];
+          if (event.shiftKey) {
+            controlGroups.set(n, [...(controlGroups.get(n) ?? []), ...current]);
+          } else {
+            controlGroups.set(n, current);
+          }
+        } else {
+          const alive = new Set(game.state.players.player.units.map((unit) => unit.id));
+          const ids = (controlGroups.get(n) ?? []).filter((id) => alive.has(id));
+          if (ids.length > 0) {
+            game.execute({ type: "SELECT_UNITS", unitIds: ids });
+          }
+        }
+      }
       if (code === "KeyT" && game.state.status === "playing") {
         game.autoPlay = !game.autoPlay;
         loop.timeScale = game.autoPlay ? 5 : 1;
