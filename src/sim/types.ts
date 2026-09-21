@@ -93,11 +93,19 @@ export interface UiState {
 
 export type GameStatus = "playing" | "victory" | "defeat";
 
+export interface GameStats {
+  playerUnitsLost: number;
+  playerUnitsKilled: number;
+  playerBuildingsLost: number;
+  playerBuildingsDestroyed: number;
+}
+
 export interface GameState {
   status: GameStatus;
   time: number;
   players: Record<PlayerId, PlayerState>;
   projectiles: Projectile[];
   ui: UiState;
+  stats: GameStats;
   nextId: number;
 }

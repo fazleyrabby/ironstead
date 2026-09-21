@@ -90,6 +90,12 @@ export function createInitialState(): GameState {
     },
     projectiles: [],
     ui: { selectedUnitIds: [] },
+    stats: {
+      playerUnitsLost: 0,
+      playerUnitsKilled: 0,
+      playerBuildingsLost: 0,
+      playerBuildingsDestroyed: 0,
+    },
     nextId: 1,
   };
 

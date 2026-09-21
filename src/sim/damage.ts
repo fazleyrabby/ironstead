@@ -20,6 +20,8 @@ export function damageUnit(
     unit.targetKind = undefined;
     unit.assignedBuildingId = undefined;
     state.ui.selectedUnitIds = state.ui.selectedUnitIds.filter((id) => id !== unit.id);
+    if (unit.owner === "player") state.stats.playerUnitsLost += 1;
+    else state.stats.playerUnitsKilled += 1;
     events.emit("unit:died", unit);
   }
 }
@@ -49,6 +51,9 @@ export function damageBuilding(
         if (unit.assignedBuildingId === building.id) unit.assignedBuildingId = undefined;
       }
     }
+
+    if (building.owner === "player") state.stats.playerBuildingsLost += 1;
+    else state.stats.playerBuildingsDestroyed += 1;
 
     events.emit("building:destroyed", building);
   }

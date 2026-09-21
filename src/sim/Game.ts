@@ -60,6 +60,8 @@ export class Game {
   }
 
   update(dt: number): void {
+    if (this.state.status !== "playing") return;
+
     for (const command of this.queue) {
       this.apply(command);
     }
@@ -78,6 +80,25 @@ export class Game {
     if (this.visibilityTimer >= VISIBILITY_INTERVAL) {
       this.visibilityTimer = 0;
       updateVisibility(this.state, this.visibility);
+    }
+
+    this.checkOutcome();
+  }
+
+  private checkOutcome(): void {
+    if (this.state.status !== "playing") return;
+
+    const hasTownCenter = (id: PlayerId): boolean =>
+      this.state.players[id].buildings.some(
+        (building) => building.type === "town_center" && building.state !== "destroyed",
+      );
+
+    if (!hasTownCenter("player")) {
+      this.state.status = "defeat";
+      this.events.emit("defeat", this.state.stats);
+    } else if (!hasTownCenter("enemy")) {
+      this.state.status = "victory";
+      this.events.emit("victory", this.state.stats);
     }
   }
 

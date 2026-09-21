@@ -255,3 +255,83 @@ body {
 .btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+
+.outcome {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 16, 0.72);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.outcome.hidden {
+  display: none;
+}
+
+.outcome-box {
+  width: min(420px, 88vw);
+  padding: 28px 30px;
+  border-radius: 20px;
+  text-align: center;
+  background: rgba(16, 18, 28, 0.96);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.outcome.is-victory .outcome-box,
+.outcome.is-victory {
+  border-color: rgba(126, 224, 129, 0.5);
+}
+
+.outcome-title {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #f87171;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.outcome.is-victory .outcome-title {
+  color: #7ee081;
+}
+
+.outcome-subtitle {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.outcome-stats {
+  margin: 20px 0 6px;
+  text-align: left;
+}
+
+.outcome-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 13px;
+  color: #cbd2e0;
+}
+
+.outcome-row b {
+  color: var(--fg);
+}
+
+.outcome-btn {
+  margin-top: 18px;
+  padding: 12px 26px;
+  font-size: 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border: 1px solid rgba(147, 197, 253, 0.5);
+}
+
+.outcome-btn:hover {
+  background: linear-gradient(180deg, #4f8ef7, #2f6fe0);
+}

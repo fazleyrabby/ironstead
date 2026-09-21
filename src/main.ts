@@ -22,6 +22,7 @@ import { isTileVisible } from "./sim/visibility";
 import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
+import { OutcomeOverlay } from "./ui/OutcomeOverlay";
 
 function placementOrigin(type: BuildingType, tile: { x: number; y: number }) {
   const definition = def(type);
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
   const selectionBox = new SelectionBox(screenLayer);
   const hud = new Hud(hudTop);
   const commandPanel = new CommandPanel(hudBottom, (command) => game.execute(command));
+  const outcome = new OutcomeOverlay(document.body, () => window.location.reload());
 
   function hoverOrigin(): { x: number; y: number } {
     const worldPoint = camera.screenToWorld(input.pointer.x, input.pointer.y);
@@ -298,6 +300,7 @@ async function main(): Promise<void> {
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state);
       commandPanel.update(game.state);
+      outcome.update(game.state.status, game.state.stats, game.state.time);
       app.renderer.render(app.stage);
     },
   );
