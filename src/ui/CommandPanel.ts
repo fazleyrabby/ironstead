@@ -1,6 +1,7 @@
 import { BUILDABLE_TYPES, BUILDING_ICONS, BUILDINGS } from "../config/buildings";
+import { DEMOLISH } from "../config/demolish";
 import { HERO } from "../config/hero";
-import { RESEARCH, RESEARCH_LINES } from "../config/research";
+import { ECONOMY_LINES, MILITARY_LINES, RESEARCH, RESEARCH_LINES } from "../config/research";
 import type { ResearchLine } from "../config/research";
 import { RESOURCE_ICONS } from "../config/resources";
 import { UNIT_ICONS } from "../config/units";
@@ -54,6 +55,7 @@ export class CommandPanel {
   private readonly root: HTMLElement;
   private readonly execute: (command: Command) => void;
   private signature = "";
+  private pendingDemolish?: string;
 
   constructor(parent: HTMLElement, execute: (command: Command) => void) {
     this.root = parent;
@@ -89,9 +91,23 @@ export class CommandPanel {
       return;
     }
 
+    const repairButton = target.closest<HTMLElement>("[data-repair]");
+    if (repairButton?.dataset.repair) {
+      this.execute({ type: "REPAIR", unitIds: [], buildingId: repairButton.dataset.repair });
+      return;
+    }
+
     const action = target.closest<HTMLElement>("[data-action]")?.dataset.action;
     if (action === "cancel") {
       this.execute({ type: "CANCEL_PLACEMENT" });
+      return;
+    }
+    if (action === "open-build") {
+      this.execute({ type: "TOGGLE_BUILD", open: true });
+      return;
+    }
+    if (action === "close-build") {
+      this.execute({ type: "TOGGLE_BUILD", open: false });
       return;
     }
     if (action === "rally") {
@@ -100,6 +116,25 @@ export class CommandPanel {
     }
     if (action === "upgrade-hero") {
       this.execute({ type: "UPGRADE_HERO" });
+      return;
+    }
+    if (action === "demolish") {
+      this.pendingDemolish = target.closest<HTMLElement>("[data-building-id]")?.dataset
+        .buildingId;
+      this.signature = "";
+      return;
+    }
+    if (action === "confirm-demolish") {
+      if (this.pendingDemolish) {
+        this.execute({ type: "DEMOLISH", buildingId: this.pendingDemolish });
+      }
+      this.pendingDemolish = undefined;
+      this.signature = "";
+      return;
+    }
+    if (action === "cancel-demolish") {
+      this.pendingDemolish = undefined;
+      this.signature = "";
       return;
     }
     if (action === "deselect") {
@@ -117,24 +152,65 @@ export class CommandPanel {
 
     const hero = player.units.find((unit) => unit.type === "hero");
 
+    if (this.pendingDemolish && this.pendingDemolish !== selected?.id) {
+      this.pendingDemolish = undefined;
+    }
+
     const signature = [
       state.ui.pendingBuild ?? "",
+      state.ui.buildOpen ? "b" : "",
+      this.pendingDemolish ?? "",
       selected?.id ?? "",
       selected ? Math.ceil((selected.hp / selected.maxHp) * 20) : "",
       selected ? selected.state : "",
-      selected ? selected.queue.map((order) => `${order.unitType}:${Math.floor(order.progress * 10)}`).join(",") : "",
+      selected ? selected.queue.map((order) => `${order.unitType}:${Math.floor(order.progress * 5)}`).join(",") : "",
       state.ui.selectedUnitIds.join(","),
       hero ? `h${hero.heroLevel ?? 1}:${Math.ceil(hero.abilityCooldown)}` : "",
       RESEARCH_LINES.map((line) => player.research[line] ?? 0).join(","),
       state.status,
-      Math.floor(player.resources.food),
-      Math.floor(player.resources.wood),
-      Math.floor(player.resources.gold),
+      this.affordability(state, selected),
     ].join("|");
 
     if (signature === this.signature) return;
     this.signature = signature;
     this.render(state, selected, selectedUnits);
+  }
+
+  // Fingerprint of which buttons are affordable so the panel only rebuilds when
+  // that changes, not on every resource tick (re-rendering mid-click eats clicks).
+  private affordability(state: GameState, selected: Building | undefined): string {
+    const player = state.players.player;
+    const resources = player.resources;
+    const bits: string[] = [];
+
+    if (state.ui.buildOpen) {
+      for (const type of BUILDABLE_TYPES) {
+        bits.push(canAfford(resources, BUILDINGS[type].cost) ? "1" : "0");
+      }
+    }
+
+    if (selected && selected.owner === "player") {
+      const popFull = unitCount(player) >= populationCap(player);
+      const produces = def(selected.type).produces ?? [];
+      for (const unit of produces) {
+        bits.push(canAfford(resources, unitDef(unit).cost) && !popFull ? "1" : "0");
+      }
+      if (selected.type === "academy") {
+        for (const line of RESEARCH_LINES) {
+          const level = player.research[line] ?? 0;
+          const tier = level < RESEARCH[line].tiers.length ? RESEARCH[line].tiers[level] : undefined;
+          bits.push(tier && canAfford(resources, tier.cost) ? "1" : "0");
+        }
+      }
+      if (selected.type === "town_center") {
+        const hero = player.units.find((unit) => unit.type === "hero");
+        const level = hero?.heroLevel ?? 1;
+        const cost = level < HERO.levels.length ? HERO.levels[level].upgradeCost : undefined;
+        bits.push(cost && canAfford(resources, cost) ? "1" : "0");
+      }
+    }
+
+    return bits.join("");
   }
 
   private render(state: GameState, selected: Building | undefined, selectedUnits: Unit[]): void {
@@ -151,7 +227,17 @@ export class CommandPanel {
       this.root.innerHTML = this.selectionHtml(state, selected);
       return;
     }
-    this.root.innerHTML = this.buildHtml(state);
+    if (state.ui.buildOpen) {
+      this.root.innerHTML = this.buildHtml(state);
+      return;
+    }
+    this.root.innerHTML = `
+      <div class="panel panel-collapsed">
+        <button class="build-fab" data-action="open-build" title="Build (B)">
+          <span class="fab-icon">\u{1F528}</span>
+          <span class="fab-label">Build</span>
+        </button>
+      </div>`;
   }
 
   private placementHtml(type: BuildingType): string {
@@ -205,9 +291,12 @@ export class CommandPanel {
     const definition = def(building.type);
     const hpRatio = Math.max(0, Math.min(1, building.hp / building.maxHp));
     const stats = statsLabel(state, building);
-    const production = this.productionHtml(state, building);
-    const heroUpgrade = this.heroUpgradeHtml(state, building);
-    const research = this.researchHtml(state, building);
+    const own = building.owner === "player";
+    const production = own ? this.productionHtml(state, building) : "";
+    const heroUpgrade = own ? this.heroUpgradeHtml(state, building) : "";
+    const research = own ? this.researchHtml(state, building) : "";
+    const repair = own ? this.repairHtml(building) : "";
+    const demolish = own ? this.demolishHtml(building) : "";
 
     return `
       <div class="panel">
@@ -216,13 +305,43 @@ export class CommandPanel {
         ${heroUpgrade}
         ${research}
         ${production}
+        ${repair}
         <div class="hpbar"><i style="width:${(hpRatio * 100).toFixed(1)}%"></i></div>
         <div class="panel-hint">HP ${Math.ceil(building.hp)} / ${building.maxHp}${
-          building.state === "constructing" ? " · under construction" : ""
+          building.state === "constructing" ? " \u00b7 under construction" : ""
         }</div>
         ${stats ? `<div class="panel-stats">${stats}</div>` : ""}
+        ${demolish}
         <button class="btn btn-ghost" data-action="deselect">Close</button>
       </div>`;
+  }
+
+  private repairHtml(building: Building): string {
+    if (building.state !== "complete" || building.hp >= building.maxHp) return "";
+    return `
+      <div class="panel-sub">REPAIR</div>
+      <button class="btn btn-repair" data-repair="${building.id}">
+        \u{1F527} Send villagers to repair
+      </button>`;
+  }
+
+  private demolishHtml(building: Building): string {
+    if (building.state === "destroyed") return "";
+    if ((DEMOLISH.blocked as readonly BuildingType[]).includes(building.type)) return "";
+
+    if (this.pendingDemolish === building.id) {
+      return `
+        <div class="panel-sub">DEMOLISH</div>
+        <div class="panel-hint">Refund ${Math.round(DEMOLISH.refund * 100)}% of the build cost. This cannot be undone.</div>
+        <div class="btn-row">
+          <button class="btn btn-danger" data-action="confirm-demolish">Demolish</button>
+          <button class="btn btn-ghost" data-action="cancel-demolish">Cancel</button>
+        </div>`;
+    }
+    return `
+      <button class="btn btn-ghost" data-action="demolish" data-building-id="${building.id}">
+        Demolish building
+      </button>`;
   }
 
   private heroUpgradeHtml(state: GameState, building: Building): string {
@@ -254,7 +373,7 @@ export class CommandPanel {
     if (building.type !== "academy" || building.state !== "complete") return "";
     const player = state.players.player;
 
-    const buttons = RESEARCH_LINES.map((line) => {
+    const button = (line: ResearchLine): string => {
       const research = RESEARCH[line];
       const level = player.research[line] ?? 0;
       const maxed = level >= research.tiers.length;
@@ -263,18 +382,20 @@ export class CommandPanel {
       const pips = `${"\u25CF".repeat(level)}${"\u25CB".repeat(research.tiers.length - level)}`;
       const costText = maxed || !tier ? `MAX ${pips}` : `${costLabel(tier.cost)} ${pips}`;
       return `
-        <button class="build-btn${affordable ? "" : " is-disabled"}" data-research="${line}" ${
+        <button class="build-btn${affordable ? "" : " is-disabled"}" data-research="${line}" title="${research.description}" ${
           affordable ? "" : "disabled"
         }>
           <span class="bb-icon">${research.icon}</span>
           <span class="bb-name">${research.name}</span>
           <span class="bb-cost">${costText}</span>
         </button>`;
-    }).join("");
+    };
 
     return `
-      <div class="panel-sub">RESEARCH</div>
-      <div class="build-grid">${buttons}</div>`;
+      <div class="panel-sub">ECONOMY RESEARCH</div>
+      <div class="build-grid">${ECONOMY_LINES.map(button).join("")}</div>
+      <div class="panel-sub">MILITARY RESEARCH</div>
+      <div class="build-grid">${MILITARY_LINES.map(button).join("")}</div>`;
   }
 
   private productionHtml(state: GameState, building: Building): string {
@@ -335,7 +456,9 @@ export class CommandPanel {
 
     return `
       <div class="panel">
-        <div class="panel-head">BUILD</div>
+        <div class="panel-head">BUILD
+          <button class="panel-x" data-action="close-build" title="Close (Esc)">&times;</button>
+        </div>
         <div class="build-grid">${buttons}</div>
       </div>`;
   }

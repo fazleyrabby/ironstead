@@ -1,4 +1,5 @@
 import { UNITS } from "../../config/units";
+import { moveMultiplier } from "../../config/research";
 import { TILE_SIZE, WORLD_HEIGHT, WORLD_WIDTH, worldToTile } from "../../config/world";
 import { findPath, nearestFreeTile, tileToWorldCenter } from "../pathfinding";
 import type { NavGrid } from "../navgrid";
@@ -93,7 +94,10 @@ export class MovementSystem {
           continue;
         }
 
-        const speed = UNITS[unit.type].speed * (unit.rallyTimer > 0 ? 1.2 : 1);
+        const speed =
+          UNITS[unit.type].speed *
+          (unit.rallyTimer > 0 ? 1.2 : 1) *
+          moveMultiplier(state.players[id]);
         let remaining = speed * dt;
 
         while (remaining > 0 && unit.path.length > 0) {
@@ -134,6 +138,9 @@ export class MovementSystem {
       }
     }
 
+    const pushX = new Array<number>(all.length).fill(0);
+    const pushY = new Array<number>(all.length).fill(0);
+
     for (let i = 0; i < all.length; i += 1) {
       for (let j = i + 1; j < all.length; j += 1) {
         const a = all[i];
@@ -152,19 +159,30 @@ export class MovementSystem {
           const push = ((minDist - dist) / 2) * 0.6;
           const nx = dx / dist;
           const ny = dy / dist;
-          const ax = clamp(a.x - nx * push, 0, WORLD_WIDTH);
-          const ay = clamp(a.y - ny * push, 0, WORLD_HEIGHT);
-          const bx = clamp(b.x + nx * push, 0, WORLD_WIDTH);
-          const by = clamp(b.y + ny * push, 0, WORLD_HEIGHT);
-          if (!this.nav.isBlocked(Math.floor(ax / TILE_SIZE), Math.floor(ay / TILE_SIZE))) {
-            a.x = ax;
-            a.y = ay;
-          }
-          if (!this.nav.isBlocked(Math.floor(bx / TILE_SIZE), Math.floor(by / TILE_SIZE))) {
-            b.x = bx;
-            b.y = by;
-          }
+          pushX[i] -= nx * push;
+          pushY[i] -= ny * push;
+          pushX[j] += nx * push;
+          pushY[j] += ny * push;
         }
+      }
+    }
+
+    const maxStep = 3;
+    for (let i = 0; i < all.length; i += 1) {
+      const unit = all[i];
+      let dx = pushX[i];
+      let dy = pushY[i];
+      const len = Math.hypot(dx, dy);
+      if (len <= 0.001) continue;
+      if (len > maxStep) {
+        dx = (dx / len) * maxStep;
+        dy = (dy / len) * maxStep;
+      }
+      const nx = clamp(unit.x + dx, 0, WORLD_WIDTH);
+      const ny = clamp(unit.y + dy, 0, WORLD_HEIGHT);
+      if (!this.nav.isBlocked(Math.floor(nx / TILE_SIZE), Math.floor(ny / TILE_SIZE))) {
+        unit.x = nx;
+        unit.y = ny;
       }
     }
   }

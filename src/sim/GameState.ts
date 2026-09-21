@@ -82,7 +82,7 @@ function createPlayer(id: PlayerId): PlayerState {
     resources: { ...STARTING_RESOURCES },
     buildings: [],
     units: [],
-    research: { farming: 0, lumber: 0, mining: 0 },
+    research: { farming: 0, lumber: 0, mining: 0, weapons: 0, armor: 0, training: 0 },
   };
 }
 
@@ -95,7 +95,7 @@ export function createInitialState(): GameState {
       enemy: createPlayer("enemy"),
     },
     projectiles: [],
-    ui: { selectedUnitIds: [] },
+    ui: { selectedUnitIds: [], buildOpen: false },
     stats: {
       playerUnitsLost: 0,
       playerUnitsKilled: 0,

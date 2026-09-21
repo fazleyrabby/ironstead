@@ -4,6 +4,7 @@ import { GRID_COLS, GRID_ROWS, TILE_SIZE, worldToTile } from "./config/world";
 import { EventBus } from "./core/EventBus";
 import { GameLoop } from "./core/GameLoop";
 import { InputManager } from "./input/InputManager";
+import { loadGameAssets, USE_SPRITE_ASSETS } from "./render/Assets";
 import { BuildingRenderer } from "./render/BuildingRenderer";
 import { Camera } from "./render/Camera";
 import { FogRenderer } from "./render/FogRenderer";
@@ -22,6 +23,7 @@ import { isTileVisible } from "./sim/visibility";
 import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
+import { MainMenu } from "./ui/MainMenu";
 import { OutcomeOverlay } from "./ui/OutcomeOverlay";
 import { SoundFX } from "./audio/sfx";
 
@@ -57,24 +59,26 @@ async function main(): Promise<void> {
   app.stage.addChild(world, screenLayer);
   buildWorldScene(world);
 
-  const buildingLayer = new Container();
-  const unitLayer = new Container();
+  const entityLayer = new Container();
+  entityLayer.sortableChildren = true;
   const projectileLayer = new Container();
   const ghostLayer = new Container();
   const fogLayer = new Container();
-  world.addChild(buildingLayer, unitLayer, projectileLayer, ghostLayer, fogLayer);
+  world.addChild(entityLayer, projectileLayer, ghostLayer, fogLayer);
 
   const events = new EventBus();
   const game = new Game(events);
   const camera = new Camera(world);
   camera.resize(app.screen.width, app.screen.height);
 
+  if (USE_SPRITE_ASSETS) await loadGameAssets();
+
   const baseTile = MAP_LAYOUT.player.baseTile;
   const baseCenter = { x: baseTile.x * TILE_SIZE, y: baseTile.y * TILE_SIZE };
   camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
 
-  const buildingRenderer = new BuildingRenderer(buildingLayer);
-  const unitRenderer = new UnitRenderer(unitLayer);
+  const buildingRenderer = new BuildingRenderer(entityLayer);
+  const unitRenderer = new UnitRenderer(entityLayer);
   const projectileRenderer = new ProjectileRenderer(projectileLayer);
   const fog = new FogRenderer(fogLayer, GRID_COLS, GRID_ROWS);
   const ghost = new PlacementGhost(ghostLayer);
@@ -89,6 +93,22 @@ async function main(): Promise<void> {
   });
   const commandPanel = new CommandPanel(hudBottom, (command) => game.execute(command));
   const outcome = new OutcomeOverlay(document.body, () => window.location.reload());
+
+  let started = false;
+  new MainMenu(document.body, {
+    onStart: () => {
+      started = true;
+      document.body.classList.remove("menu-open");
+      loop.timeScale = 1;
+      sfx.play("click");
+    },
+    isSoundOn: () => sfx.isEnabled(),
+    onToggleSound: () => {
+      sfx.toggle();
+      sfx.play("click");
+    },
+  });
+  document.body.classList.add("menu-open");
 
   function hoverOrigin(): { x: number; y: number } {
     const worldPoint = camera.screenToWorld(input.pointer.x, input.pointer.y);
@@ -255,10 +275,22 @@ async function main(): Promise<void> {
     onSecondaryClick: handleSecondary,
     onBoxSelect: handleBox,
     onKeyDown: (code) => {
+      if (!started) return;
       if (code === "Escape") {
-        game.execute({ type: "CANCEL_PLACEMENT" });
-        game.execute({ type: "SELECT_BUILDING" });
-        game.execute({ type: "SELECT_UNITS", unitIds: [] });
+        if (game.state.ui.pendingBuild) {
+          game.execute({ type: "CANCEL_PLACEMENT" });
+        } else if (
+          game.state.ui.selectedBuildingId !== undefined ||
+          game.state.ui.selectedUnitIds.length > 0
+        ) {
+          game.execute({ type: "SELECT_BUILDING" });
+          game.execute({ type: "SELECT_UNITS", unitIds: [] });
+        } else if (game.state.ui.buildOpen) {
+          game.execute({ type: "TOGGLE_BUILD", open: false });
+        }
+      }
+      if (code === "KeyB" && game.state.status === "playing") {
+        game.execute({ type: "TOGGLE_BUILD" });
       }
       if (code === "KeyC") {
         camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
@@ -287,6 +319,7 @@ async function main(): Promise<void> {
   events.on("building:created", () => sfx.play("place"));
   events.on("building:completed", () => sfx.play("complete"));
   events.on("building:destroyed", () => sfx.play("destroyed"));
+  events.on("building:demolished", () => sfx.play("destroyed"));
   events.on("building:repaired", () => sfx.play("complete"));
   events.on("unit:created", () => sfx.play("train"));
   events.on("unit:died", () => sfx.play("die"));
@@ -353,6 +386,7 @@ async function main(): Promise<void> {
       app.renderer.render(app.stage);
     },
   );
+  loop.timeScale = 0;
   loop.start();
 
   window.addEventListener("resize", () => {

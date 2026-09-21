@@ -1,5 +1,6 @@
 import { worldToTile } from "../../config/world";
 import type { EventBus } from "../../core/EventBus";
+import { attackMultiplier, attackSpeedMultiplier } from "../../config/research";
 import { damageBuilding, damageUnit } from "../damage";
 import { def, unitDef } from "../selectors";
 import { findPath, nearestFreeTile, tileToWorldCenter } from "../pathfinding";
@@ -100,7 +101,8 @@ export class CombatSystem {
           unit.path = [];
           unit.attackTimer -= dt * (unit.rallyTimer > 0 ? 1.2 : 1);
           if (unit.attackTimer <= 0) {
-            unit.attackTimer = definition.attackCooldown;
+            unit.attackTimer =
+              definition.attackCooldown / attackSpeedMultiplier(state.players[unit.owner]);
             this.strike(state, unit, target);
           }
         } else {
@@ -158,6 +160,7 @@ export class CombatSystem {
   private strike(state: GameState, attacker: Unit, target: Target): void {
     const definition = unitDef(attacker.type);
     let damage = attacker.type === "hero" ? heroAttack(attacker) : definition.damage;
+    damage *= attackMultiplier(state.players[attacker.owner]);
     if (target.kind === "unit" && definition.counters?.includes(target.unit.type)) {
       damage *= 1.5;
     }

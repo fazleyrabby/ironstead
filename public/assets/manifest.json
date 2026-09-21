@@ -1,0 +1,142 @@
+{
+  "buildings": {
+    "tc_blue": {
+      "w": 174,
+      "h": 204
+    },
+    "tc_red": {
+      "w": 174,
+      "h": 204
+    },
+    "house_blue": {
+      "w": 186,
+      "h": 186
+    },
+    "house_red": {
+      "w": 186,
+      "h": 186
+    },
+    "storage_blue": {
+      "w": 198,
+      "h": 210
+    },
+    "storage_red": {
+      "w": 198,
+      "h": 210
+    },
+    "army_camp_blue": {
+      "w": 180,
+      "h": 142
+    },
+    "army_camp_red": {
+      "w": 180,
+      "h": 142
+    },
+    "tower_blue": {
+      "w": 96,
+      "h": 184
+    },
+    "tower_red": {
+      "w": 96,
+      "h": 184
+    },
+    "academy_blue": {
+      "w": 146,
+      "h": 172
+    },
+    "academy_red": {
+      "w": 146,
+      "h": 172
+    },
+    "farm": {
+      "w": 173,
+      "h": 136
+    },
+    "wall": {
+      "w": 142,
+      "h": 126
+    },
+    "forest": {
+      "w": 167,
+      "h": 138
+    },
+    "gold_vein": {
+      "w": 187,
+      "h": 123
+    }
+  },
+  "units": {
+    "villager": {
+      "blue": {
+        "frames": 6,
+        "w": 67,
+        "h": 102
+      },
+      "red": {
+        "frames": 6,
+        "w": 67,
+        "h": 102
+      }
+    },
+    "swordsman": {
+      "blue": {
+        "frames": 6,
+        "w": 84,
+        "h": 111
+      },
+      "red": {
+        "frames": 6,
+        "w": 84,
+        "h": 111
+      }
+    },
+    "spearman": {
+      "blue": {
+        "frames": 6,
+        "w": 65,
+        "h": 88
+      },
+      "red": {
+        "frames": 6,
+        "w": 65,
+        "h": 88
+      }
+    },
+    "crossbowman": {
+      "blue": {
+        "frames": 6,
+        "w": 65,
+        "h": 84
+      },
+      "red": {
+        "frames": 6,
+        "w": 65,
+        "h": 84
+      }
+    },
+    "hero": {
+      "blue": {
+        "frames": 6,
+        "w": 56,
+        "h": 89
+      },
+      "red": {
+        "frames": 6,
+        "w": 56,
+        "h": 89
+      }
+    },
+    "horse_rider": {
+      "blue": {
+        "frames": 6,
+        "w": 100,
+        "h": 88
+      },
+      "red": {
+        "frames": 6,
+        "w": 100,
+        "h": 88
+      }
+    }
+  }
+}

@@ -4,6 +4,8 @@ import type { BuildingType, PlayerId, UnitType } from "./types";
 export type Command =
   | { type: "BEGIN_PLACEMENT"; buildingType: BuildingType }
   | { type: "CANCEL_PLACEMENT" }
+  | { type: "TOGGLE_BUILD"; open?: boolean }
+  | { type: "DEMOLISH"; buildingId: string; faction?: PlayerId }
   | {
       type: "PLACE_BUILDING";
       buildingType: BuildingType;

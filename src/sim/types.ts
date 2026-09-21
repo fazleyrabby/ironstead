@@ -105,6 +105,7 @@ export interface UiState {
   hoverTile?: { x: number; y: number };
   selectedBuildingId?: string;
   selectedUnitIds: string[];
+  buildOpen: boolean;
 }
 
 export type GameStatus = "playing" | "victory" | "defeat";

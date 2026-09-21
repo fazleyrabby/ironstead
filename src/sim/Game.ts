@@ -1,13 +1,16 @@
 import type { EventBus } from "../core/EventBus";
+import { DEMOLISH, demolishRefund } from "../config/demolish";
 import { PONDS } from "../config/map";
-import { GRID_COLS, GRID_ROWS, TILE_SIZE } from "../config/world";
+import { GRID_COLS, GRID_ROWS } from "../config/world";
 import type { Command } from "./commands";
 import { canPlace } from "./placement";
+import { demolishBuilding } from "./damage";
 import { def, canAfford, freeWorkerSlots, spendCost } from "./selectors";
+import { REPAIR } from "../config/repair";
 import { RESEARCH } from "../config/research";
 import { createInitialState, spawnBuilding, spawnUnit } from "./GameState";
 import { NavGrid } from "./navgrid";
-import { nearestFreeTile, tileToWorldCenter } from "./pathfinding";
+import { tileToWorldCenter } from "./pathfinding";
 import { createVisibility, updateVisibility } from "./visibility";
 import type { VisibilityMap } from "./visibility";
 import { ConstructionSystem } from "./systems/ConstructionSystem";
@@ -144,27 +147,26 @@ export class Game {
       );
       if (!townCenter) continue;
 
+      const used = new Set<string>();
+      const centerTileX = townCenter.tileX + 2;
+      const centerTileY = townCenter.tileY + 2;
+
       for (let i = 0; i < STARTING_VILLAGERS; i += 1) {
         const angle = (i / STARTING_VILLAGERS) * Math.PI * 2;
-        const tileX = Math.floor(
-          (townCenter.x + Math.cos(angle) * (townCenter.width / 2 + 48)) / TILE_SIZE,
-        );
-        const tileY = Math.floor(
-          (townCenter.y + Math.sin(angle) * (townCenter.height / 2 + 48)) / TILE_SIZE,
-        );
-        const free = nearestFreeTile(this.nav, tileX, tileY, 12);
-        const point = free
-          ? tileToWorldCenter(free.x, free.y)
-          : { x: townCenter.x, y: townCenter.y };
+        const ringTileX = Math.round(centerTileX + Math.cos(angle) * 4);
+        const ringTileY = Math.round(centerTileY + Math.sin(angle) * 4);
+        const point = this.claimSpawnTile(used, ringTileX, ringTileY) ?? {
+          x: townCenter.x,
+          y: townCenter.y,
+        };
         this.state.players[id].units.push(spawnUnit(this.state, id, "villager", point.x, point.y));
       }
 
-      const heroTileX = Math.floor((townCenter.x + townCenter.width / 2 + 40) / TILE_SIZE);
-      const heroTileY = Math.floor(townCenter.y / TILE_SIZE);
-      const heroFree = nearestFreeTile(this.nav, heroTileX, heroTileY, 12);
-      const heroPoint = heroFree
-        ? tileToWorldCenter(heroFree.x, heroFree.y)
-        : { x: townCenter.x, y: townCenter.y };
+      const heroPoint = this.claimSpawnTile(
+        used,
+        centerTileX + 4,
+        centerTileY + 1,
+      ) ?? { x: townCenter.x, y: townCenter.y };
       const hero = spawnUnit(this.state, id, "hero", heroPoint.x, heroPoint.y);
       const heroStats = HERO.levels[0];
       hero.hp = heroStats.hp;
@@ -172,6 +174,28 @@ export class Game {
       this.state.players[id].units.push(hero);
       this.state.players[id].heroId = hero.id;
     }
+  }
+
+  private claimSpawnTile(
+    used: Set<string>,
+    tileX: number,
+    tileY: number,
+  ): { x: number; y: number } | undefined {
+    for (let radius = 0; radius <= 14; radius += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+          const x = tileX + dx;
+          const y = tileY + dy;
+          const key = `${x},${y}`;
+          if (used.has(key)) continue;
+          if (!this.nav.inBounds(x, y) || this.nav.isBlocked(x, y)) continue;
+          used.add(key);
+          return tileToWorldCenter(x, y);
+        }
+      }
+    }
+    return undefined;
   }
 
   private placeBuilding(
@@ -204,6 +228,22 @@ export class Game {
     return player.units.filter((unit) => ids.has(unit.id) && unit.state !== "dead");
   }
 
+  private nearestVillagers(faction: PlayerId, building: Building, count: number): Unit[] {
+    return this.state.players[faction].units
+      .filter(
+        (unit) =>
+          unit.type === "villager" &&
+          unit.state !== "dead" &&
+          unit.repairBuildingId !== building.id,
+      )
+      .sort(
+        (a, b) =>
+          Math.hypot(a.x - building.x, a.y - building.y) -
+          Math.hypot(b.x - building.x, b.y - building.y),
+      )
+      .slice(0, count);
+  }
+
   private apply(command: Command): void {
     const ui = this.state.ui;
 
@@ -217,6 +257,10 @@ export class Game {
       case "CANCEL_PLACEMENT": {
         ui.pendingBuild = undefined;
         ui.hoverTile = undefined;
+        break;
+      }
+      case "TOGGLE_BUILD": {
+        ui.buildOpen = command.open ?? !ui.buildOpen;
         break;
       }
       case "PLACE_BUILDING": {
@@ -306,12 +350,32 @@ export class Game {
             entry.hp < entry.maxHp,
         );
         if (!building) break;
-        const villagers = this.unitsOf(faction, command.unitIds).filter(
+        const requested = this.unitsOf(faction, command.unitIds).filter(
           (unit) => unit.type === "villager",
         );
+        const villagers =
+          requested.length > 0
+            ? requested
+            : this.nearestVillagers(faction, building, REPAIR.maxWorkers);
         if (villagers.length === 0) break;
         this.movement.orderRepair(villagers, building);
         this.events.emit("repair:started", building.id);
+        break;
+      }
+      case "DEMOLISH": {
+        const faction = command.faction ?? "player";
+        const building = this.state.players[faction].buildings.find(
+          (entry) => entry.id === command.buildingId && entry.state !== "destroyed",
+        );
+        if (!building || (DEMOLISH.blocked as readonly BuildingType[]).includes(building.type)) break;
+        demolishBuilding(
+          this.state,
+          this.events,
+          this.nav,
+          building,
+          demolishRefund(def(building.type).cost),
+        );
+        this.events.emit("resource:changed", faction);
         break;
       }
       case "UPGRADE_HERO": {
