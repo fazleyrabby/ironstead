@@ -27,56 +27,44 @@ export class VoxelWorld {
     this.bridgeMat = new THREE.MeshBasicMaterial({ color: 0x8b5a2b, wireframe: debug });
   }
 
-  /** Rebuild meshes from a VoxelNav. */
+  /** Rebuild terrain from a VoxelNav: one ground slab, water tiles on top,
+   *  and bridge decks over water. Far fewer meshes than per-tile ground. */
   build(nav: VoxelNav): void {
-    const mats = new Set([this.groundMat, this.waterMat, this.bridgeMat]);
     while (this.group.children.length) {
-      const child = this.group.children[0];
+      const child = this.group.children[0] as THREE.Mesh;
       this.group.remove(child);
-      if (!mats.has(child as any)) (child as any).geometry?.dispose?.();
+      child.geometry?.dispose?.();
     }
 
-    const boxGeo = new THREE.BoxGeometry(TILE, TILE, TILE);
-    const slabGeo = new THREE.BoxGeometry(TILE, 0.25, TILE);
+    const GROUND_TOP = TILE; // ground surface height in world units
+
+    // one big ground slab
+    const ground = new THREE.Mesh(
+      new THREE.BoxGeometry(nav.cols * TILE, GROUND_TOP, nav.rows * TILE),
+      this.groundMat,
+    );
+    ground.position.set(0, GROUND_TOP / 2, 0);
+    this.group.add(ground);
+
+    const waterGeo = new THREE.BoxGeometry(TILE * 0.96, 0.18, TILE * 0.96);
+    const deckGeo = new THREE.BoxGeometry(TILE * 1.06, 0.2, TILE * 1.06);
 
     for (let y = 0; y < nav.rows; y += 1) {
       for (let x = 0; x < nav.cols; x += 1) {
-        const h = nav.heightAt(x, y);
-        const bridge = this.isBridgeTile(nav, x, y);
-        const isWater = h === 0 && !bridge;
+        const wx = (x - nav.cols / 2) * TILE;
+        const wz = (y - nav.rows / 2) * TILE;
 
-        if (isWater) {
-          const m = new THREE.Mesh(boxGeo, this.waterMat);
-          m.position.set((x - nav.cols / 2) * TILE, 0, (y - nav.rows / 2) * TILE);
-          this.group.add(m);
-          continue;
-        }
-
-        for (let z = 0; z < h; z += 1) {
-          const m = new THREE.Mesh(boxGeo, this.groundMat);
-          m.position.set(
-            (x - nav.cols / 2) * TILE,
-            z * TILE,
-            (y - nav.rows / 2) * TILE,
-          );
+        if (nav.isWater(x, y)) {
+          const m = new THREE.Mesh(waterGeo, this.waterMat);
+          m.position.set(wx, GROUND_TOP + 0.06, wz);
           this.group.add(m);
         }
-
-        if (bridge) {
-          const deckY = nav.bridgeHeight * TILE;
-          const m = new THREE.Mesh(slabGeo, this.bridgeMat);
-          m.position.set(
-            (x - nav.cols / 2) * TILE,
-            deckY,
-            (y - nav.rows / 2) * TILE,
-          );
+        if (nav.isBridge(x, y)) {
+          const m = new THREE.Mesh(deckGeo, this.bridgeMat);
+          m.position.set(wx, GROUND_TOP + 0.4, wz);
           this.group.add(m);
         }
       }
     }
-  }
-
-  private isBridgeTile(nav: VoxelNav, x: number, y: number): boolean {
-    return nav.isWalkable(x, y) && nav.heightAt(x, y) === nav.bridgeHeight;
   }
 }

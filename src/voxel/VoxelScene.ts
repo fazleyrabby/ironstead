@@ -32,9 +32,9 @@ export class VoxelScene {
     this.scene = new THREE.Scene();
     const sky = new THREE.Color(0x404048);
     this.scene.background = sky;
-    this.scene.fog = new THREE.Fog(sky, 30, 60);
+    this.scene.fog = new THREE.Fog(sky, 90, 190);
 
-    this.camera = new THREE.PerspectiveCamera(45, LOWRES_W / LOWRES_H, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(45, LOWRES_W / LOWRES_H, 0.1, 400);
     this.camera.position.set(24, 22, 28);
     this.camera.lookAt(0, 0, 0);
 

@@ -34,8 +34,8 @@ describe("VoxelWorld.build", () => {
     const ground = meshes.filter((m) => (m.material as THREE.MeshBasicMaterial).color.getHex() === 0x8bc34a);
     const bridge = meshes.filter((m) => (m.material as THREE.MeshBasicMaterial).color.getHex() === 0x8b5a2b);
 
-    expect(water.length).toBe(32); // 36 tiles - 2 bridge - 2 ground island
+    expect(water.length).toBe(34); // all tiles except the 2 ground islands
     expect(bridge.length).toBe(2); // exactly the two bridge deck tiles
-    expect(ground.length).toBe(6); // 2 ground islands + 2 columns under each bridge tile
+    expect(ground.length).toBe(1); // a single ground slab now
   });
 });

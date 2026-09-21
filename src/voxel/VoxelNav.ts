@@ -46,6 +46,17 @@ export class VoxelNav {
     return this.ground[i];
   }
 
+  /** True when the tile has no ground (water), even if a bridge spans it. */
+  isWater(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) return false;
+    return this.ground[this.index(x, y)] === 0;
+  }
+
+  isBridge(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) return false;
+    return this.bridge[this.index(x, y)] === 1;
+  }
+
   isWalkable(x: number, y: number): boolean {
     if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) return false;
     const i = this.index(x, y);
