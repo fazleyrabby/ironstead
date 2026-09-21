@@ -25,6 +25,7 @@ export interface BuildingDefinition {
   storage: number;
   production?: BuildingProduction;
   attack?: BuildingAttack;
+  sight: number;
   produces?: UnitType[];
   maxWorkers?: number;
   buildable: boolean;
@@ -44,6 +45,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 5,
     storage: 500,
     produces: ["villager"],
+    sight: 11,
     buildable: false,
     colors: { body: 0xe8d8b0, roof: 0xb5533f, accent: 0xf1e6cf },
   },
@@ -58,6 +60,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     buildTime: 6,
     population: 5,
     storage: 0,
+    sight: 5,
     buildable: true,
     colors: { body: 0xd9b382, roof: 0xa0522d, accent: 0xe9cda4 },
   },
@@ -73,6 +76,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     production: { resource: "food", baseRate: 3, perWorker: 7 },
+    sight: 5,
     maxWorkers: 3,
     buildable: true,
     colors: { body: 0xc9a227, roof: 0x7a8f3a, accent: 0xe0c45a },
@@ -88,6 +92,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     buildTime: 8,
     population: 0,
     storage: 500,
+    sight: 5,
     buildable: true,
     colors: { body: 0xb08d57, roof: 0x6b4f2a, accent: 0xc8a878 },
   },
@@ -103,6 +108,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     produces: ["swordsman", "spearman", "crossbowman", "horse_rider"],
+    sight: 7,
     buildable: true,
     colors: { body: 0x8f9aa8, roof: 0x4b5563, accent: 0xaeb8c4 },
   },
@@ -118,6 +124,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     attack: { range: 250, damage: 25, cooldown: 1.2 },
+    sight: 13,
     buildable: true,
     colors: { body: 0x9ca3af, roof: 0x4b5563, accent: 0xc3c9d2 },
   },
@@ -129,6 +136,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     hp: 400,
     tilesW: 1,
     tilesH: 1,
+    sight: 3,
     buildTime: 3,
     population: 0,
     storage: 0,
@@ -147,6 +155,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     production: { resource: "wood", baseRate: 2, perWorker: 6 },
+    sight: 0,
     maxWorkers: 3,
     buildable: false,
     colors: { body: 0x2f5d34, roof: 0x3f7a44, accent: 0x538f59 },
@@ -163,6 +172,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
     population: 0,
     storage: 0,
     production: { resource: "gold", baseRate: 1.5, perWorker: 4 },
+    sight: 0,
     maxWorkers: 3,
     buildable: false,
     colors: { body: 0x8b8f9a, roof: 0x6f737d, accent: 0xf2c14e },

@@ -14,6 +14,7 @@ export interface UnitDefinition {
   counters?: string[];
   color: number;
   radius: number;
+  sight: number;
   aggressive: boolean;
   ranged: boolean;
 }
@@ -30,6 +31,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     attackCooldown: 1.2,
     productionTime: 8,
     color: 0xd9a066,
+    sight: 7,
     radius: 9,
     aggressive: false,
     ranged: false,
@@ -45,6 +47,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     attackCooldown: 1.0,
     productionTime: 10,
     color: 0x7aa2f7,
+    sight: 8,
     radius: 10,
     aggressive: true,
     ranged: false,
@@ -61,6 +64,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     productionTime: 10,
     counters: ["horse_rider"],
     color: 0x7ee081,
+    sight: 8,
     radius: 10,
     aggressive: true,
     ranged: false,
@@ -76,6 +80,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     attackCooldown: 1.3,
     productionTime: 12,
     color: 0xc792ea,
+    sight: 9,
     radius: 10,
     aggressive: true,
     ranged: true,
@@ -91,6 +96,7 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
     attackCooldown: 1.2,
     productionTime: 14,
     color: 0xcb8a4b,
+    sight: 9,
     radius: 12,
     aggressive: true,
     ranged: false,

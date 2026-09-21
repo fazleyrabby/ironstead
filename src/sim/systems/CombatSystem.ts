@@ -4,6 +4,8 @@ import { damageBuilding, damageUnit } from "../damage";
 import { def, unitDef } from "../selectors";
 import { findPath, nearestFreeTile, tileToWorldCenter } from "../pathfinding";
 import type { NavGrid } from "../navgrid";
+import { isTileVisible } from "../visibility";
+import type { VisibilityMap } from "../visibility";
 import type { Building, GameState, PlayerId, Unit } from "../types";
 
 const AGGRO_RANGE = 220;
@@ -37,12 +39,16 @@ export class CombatSystem {
     }
   }
 
-  update(state: GameState, dt: number): void {
-    this.updateUnits(state, dt);
-    this.updateTowers(state, dt);
+  update(state: GameState, visibility: Record<PlayerId, VisibilityMap>, dt: number): void {
+    this.updateUnits(state, visibility, dt);
+    this.updateTowers(state, visibility, dt);
   }
 
-  private updateUnits(state: GameState, dt: number): void {
+  private updateUnits(
+    state: GameState,
+    visibility: Record<PlayerId, VisibilityMap>,
+    dt: number,
+  ): void {
     for (const id of ["player", "enemy"] as const) {
       const foe: PlayerId = id === "player" ? "enemy" : "player";
       for (const unit of state.players[id].units) {
@@ -56,7 +62,14 @@ export class CombatSystem {
         }
 
         if (!unit.targetId && unitDef(unit.type).aggressive && unit.state === "idle") {
-          const enemy = this.nearestEnemyUnit(state, foe, unit.x, unit.y, AGGRO_RANGE);
+          const enemy = this.nearestEnemyUnit(
+            state,
+            foe,
+            visibility[id],
+            unit.x,
+            unit.y,
+            AGGRO_RANGE,
+          );
           if (enemy) {
             unit.targetKind = "unit";
             unit.targetId = enemy.id;
@@ -93,7 +106,11 @@ export class CombatSystem {
     }
   }
 
-  private updateTowers(state: GameState, dt: number): void {
+  private updateTowers(
+    state: GameState,
+    visibility: Record<PlayerId, VisibilityMap>,
+    dt: number,
+  ): void {
     for (const id of ["player", "enemy"] as const) {
       const foe: PlayerId = id === "player" ? "enemy" : "player";
       for (const building of state.players[id].buildings) {
@@ -103,7 +120,14 @@ export class CombatSystem {
         building.cooldown -= dt;
         if (building.cooldown > 0) continue;
 
-        const enemy = this.nearestEnemyUnit(state, foe, building.x, building.y, attack.range);
+        const enemy = this.nearestEnemyUnit(
+          state,
+          foe,
+          visibility[id],
+          building.x,
+          building.y,
+          attack.range,
+        );
         if (!enemy) continue;
 
         building.cooldown = attack.cooldown;
@@ -167,6 +191,7 @@ export class CombatSystem {
   private nearestEnemyUnit(
     state: GameState,
     foe: PlayerId,
+    seenBy: VisibilityMap,
     x: number,
     y: number,
     range: number,
@@ -176,10 +201,11 @@ export class CombatSystem {
     for (const unit of state.players[foe].units) {
       if (unit.state === "dead") continue;
       const dist = Math.hypot(unit.x - x, unit.y - y);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = unit;
-      }
+      if (dist >= bestDist) continue;
+      const tile = worldToTile(unit.x, unit.y);
+      if (!isTileVisible(seenBy, tile.x, tile.y)) continue;
+      bestDist = dist;
+      best = unit;
     }
     return best;
   }

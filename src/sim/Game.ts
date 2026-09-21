@@ -6,6 +6,8 @@ import { def, freeWorkerSlots, spendCost } from "./selectors";
 import { createInitialState, spawnBuilding, spawnUnit } from "./GameState";
 import { NavGrid } from "./navgrid";
 import { nearestFreeTile, tileToWorldCenter } from "./pathfinding";
+import { createVisibility, updateVisibility } from "./visibility";
+import type { VisibilityMap } from "./visibility";
 import { ConstructionSystem } from "./systems/ConstructionSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { EconomySystem } from "./systems/EconomySystem";
@@ -15,11 +17,13 @@ import { ProjectileSystem } from "./systems/ProjectileSystem";
 import type { Building, BuildingType, GameState, PlayerId, Unit } from "./types";
 
 const STARTING_VILLAGERS = 4;
+const VISIBILITY_INTERVAL = 0.2;
 
 export class Game {
   readonly state: GameState;
   readonly nav: NavGrid;
   readonly events: EventBus;
+  readonly visibility: Record<PlayerId, VisibilityMap>;
   readonly movement: MovementSystem;
   readonly production: ProductionSystem;
   readonly combat: CombatSystem;
@@ -28,11 +32,16 @@ export class Game {
   private readonly construction: ConstructionSystem;
   private readonly projectiles: ProjectileSystem;
   private readonly queue: Command[] = [];
+  private visibilityTimer = 0;
 
   constructor(events: EventBus) {
     this.events = events;
     this.state = createInitialState();
     this.nav = new NavGrid(GRID_COLS, GRID_ROWS);
+    this.visibility = {
+      player: createVisibility(GRID_COLS, GRID_ROWS),
+      enemy: createVisibility(GRID_COLS, GRID_ROWS),
+    };
     this.construction = new ConstructionSystem(events);
     this.movement = new MovementSystem(this.nav);
     this.production = new ProductionSystem(events, this.nav);
@@ -40,6 +49,7 @@ export class Game {
     this.projectiles = new ProjectileSystem(events, this.nav);
     this.rebuildNav();
     this.spawnStartingUnits();
+    updateVisibility(this.state, this.visibility);
   }
 
   execute(command: Command): void {
@@ -55,10 +65,16 @@ export class Game {
     this.economy.update(this.state, dt);
     this.construction.update(this.state, dt);
     this.production.update(this.state, dt);
-    this.combat.update(this.state, dt);
+    this.combat.update(this.state, this.visibility, dt);
     this.projectiles.update(this.state, dt);
     this.movement.update(this.state, dt);
     this.state.time += dt;
+
+    this.visibilityTimer += dt;
+    if (this.visibilityTimer >= VISIBILITY_INTERVAL) {
+      this.visibilityTimer = 0;
+      updateVisibility(this.state, this.visibility);
+    }
   }
 
   private rebuildNav(): void {

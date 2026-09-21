@@ -1,11 +1,12 @@
 import { Application, Container } from "pixi.js";
 import { MAP_LAYOUT } from "./config/map";
-import { TILE_SIZE, worldToTile } from "./config/world";
+import { GRID_COLS, GRID_ROWS, TILE_SIZE, worldToTile } from "./config/world";
 import { EventBus } from "./core/EventBus";
 import { GameLoop } from "./core/GameLoop";
 import { InputManager } from "./input/InputManager";
 import { BuildingRenderer } from "./render/BuildingRenderer";
 import { Camera } from "./render/Camera";
+import { FogRenderer } from "./render/FogRenderer";
 import { PlacementGhost } from "./render/PlacementGhost";
 import { ProjectileRenderer } from "./render/ProjectileRenderer";
 import { SelectionBox } from "./render/SelectionBox";
@@ -17,6 +18,7 @@ import { buildingAtTile, def, unitDef } from "./sim/selectors";
 import { canPlace } from "./sim/placement";
 import type { PlacementResult } from "./sim/placement";
 import { tileToWorldCenter } from "./sim/pathfinding";
+import { isTileVisible } from "./sim/visibility";
 import type { BuildingType, PlayerId, UnitType } from "./sim/types";
 import { CommandPanel } from "./ui/CommandPanel";
 import { Hud } from "./ui/Hud";
@@ -57,7 +59,8 @@ async function main(): Promise<void> {
   const unitLayer = new Container();
   const projectileLayer = new Container();
   const ghostLayer = new Container();
-  world.addChild(buildingLayer, unitLayer, projectileLayer, ghostLayer);
+  const fogLayer = new Container();
+  world.addChild(buildingLayer, unitLayer, projectileLayer, ghostLayer, fogLayer);
 
   const events = new EventBus();
   const game = new Game(events);
@@ -71,6 +74,7 @@ async function main(): Promise<void> {
   const buildingRenderer = new BuildingRenderer(buildingLayer);
   const unitRenderer = new UnitRenderer(unitLayer);
   const projectileRenderer = new ProjectileRenderer(projectileLayer);
+  const fog = new FogRenderer(fogLayer, GRID_COLS, GRID_ROWS);
   const ghost = new PlacementGhost(ghostLayer);
   const selectionBox = new SelectionBox(screenLayer);
   const hud = new Hud(hudTop);
@@ -100,10 +104,13 @@ async function main(): Promise<void> {
 
   function enemyUnitAtPoint(worldX: number, worldY: number) {
     const enemy = game.state.players.enemy;
+    const seenBy = game.visibility.player;
     let best: (typeof enemy.units)[number] | undefined;
     let bestScore = 18;
     for (const unit of enemy.units) {
       if (unit.state === "dead") continue;
+      const tile = worldToTile(unit.x, unit.y);
+      if (!isTileVisible(seenBy, tile.x, tile.y)) continue;
       const score = Math.hypot(unit.x - worldX, unit.y - worldY) - unitDef(unit.type).radius;
       if (score < bestScore) {
         bestScore = score;
@@ -111,6 +118,14 @@ async function main(): Promise<void> {
       }
     }
     return best;
+  }
+
+  function visibleEnemyBuildingAt(tileX: number, tileY: number) {
+    const hit = buildingAtTile(game.state.players.enemy, tileX, tileY);
+    if (!hit) return undefined;
+    const center = worldToTile(hit.x, hit.y);
+    if (!isTileVisible(game.visibility.player, center.x, center.y)) return undefined;
+    return hit;
   }
 
   function handlePrimary(screenX: number, screenY: number): void {
@@ -192,7 +207,7 @@ async function main(): Promise<void> {
     }
 
     const tile = worldToTile(worldPoint.x, worldPoint.y);
-    const enemyBuilding = buildingAtTile(game.state.players.enemy, tile.x, tile.y);
+    const enemyBuilding = visibleEnemyBuildingAt(tile.x, tile.y);
     if (enemyBuilding) {
       game.execute({
         type: "ATTACK_TARGET",
@@ -268,9 +283,10 @@ async function main(): Promise<void> {
       }
 
       ghost.update(game.state.ui, result);
-      buildingRenderer.update(game.state, game.state.ui.selectedBuildingId);
-      unitRenderer.update(game.state, game.state.ui.selectedUnitIds);
+      buildingRenderer.update(game.state, game.state.ui.selectedBuildingId, game.visibility.player);
+      unitRenderer.update(game.state, game.state.ui.selectedUnitIds, game.visibility.player);
       projectileRenderer.update(game.state.projectiles);
+      fog.update(game.visibility.player);
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state);
       commandPanel.update(game.state);

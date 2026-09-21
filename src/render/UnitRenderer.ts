@@ -1,6 +1,8 @@
 import { Container, Graphics } from "pixi.js";
-import { PALETTE } from "../config/world";
+import { PALETTE, worldToTile } from "../config/world";
 import { unitDef } from "../sim/selectors";
+import { isTileExplored, isTileVisible } from "../sim/visibility";
+import type { VisibilityMap } from "../sim/visibility";
 import type { GameState, PlayerId, Unit } from "../sim/types";
 
 const FACTION_COLORS: Record<PlayerId, number> = {
@@ -24,13 +26,16 @@ export class UnitRenderer {
     this.layer = layer;
   }
 
-  update(state: GameState, selectedIds: readonly string[]): void {
+  update(state: GameState, selectedIds: readonly string[], playerMap: VisibilityMap): void {
     const selected = new Set(selectedIds);
     const seen = new Set<string>();
 
     for (const id of ["player", "enemy"] as const) {
       for (const unit of state.players[id].units) {
         if (unit.state === "dead") continue;
+
+        const mode = id === "player" ? "sync" : this.enemyMode(playerMap, unit);
+        if (mode === "hide") continue;
         seen.add(unit.id);
 
         let entry = this.entries.get(unit.id);
@@ -38,7 +43,11 @@ export class UnitRenderer {
           entry = this.createEntry(unit);
           this.entries.set(unit.id, entry);
         }
-        this.sync(entry, unit, selected.has(unit.id));
+        if (mode === "sync") {
+          entry.container.visible = true;
+          entry.container.alpha = 1;
+          this.sync(entry, unit, selected.has(unit.id));
+        }
       }
     }
 
@@ -47,6 +56,20 @@ export class UnitRenderer {
       entry.container.destroy({ children: true });
       this.entries.delete(id);
     }
+  }
+
+  private enemyMode(map: VisibilityMap, unit: Unit): "sync" | "freeze" | "hide" {
+    const tile = worldToTile(unit.x, unit.y);
+    if (isTileVisible(map, tile.x, tile.y)) return "sync";
+    const entry = this.entries.get(unit.id);
+    if (!entry) return "hide";
+    if (isTileExplored(map, tile.x, tile.y)) {
+      entry.container.visible = true;
+      entry.container.alpha = 0.55;
+      return "freeze";
+    }
+    entry.container.visible = false;
+    return "hide";
   }
 
   private createEntry(unit: Unit): Entry {

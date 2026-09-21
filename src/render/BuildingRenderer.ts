@@ -1,6 +1,8 @@
 import { Container, Graphics } from "pixi.js";
 import { PALETTE } from "../config/world";
 import { def } from "../sim/selectors";
+import { isTileExplored, isTileVisible } from "../sim/visibility";
+import type { VisibilityMap } from "../sim/visibility";
 import type { Building, GameState, PlayerId } from "../sim/types";
 
 const FACTION_COLORS: Record<PlayerId, number> = {
@@ -26,12 +28,15 @@ export class BuildingRenderer {
     this.layer = layer;
   }
 
-  update(state: GameState, selectedId?: string): void {
+  update(state: GameState, selectedId: string | undefined, playerMap: VisibilityMap): void {
     const seen = new Set<string>();
 
     for (const id of ["player", "enemy"] as const) {
       for (const building of state.players[id].buildings) {
         if (building.state === "destroyed") continue;
+
+        const mode = id === "player" ? "sync" : this.enemyMode(playerMap, building);
+        if (mode === "hide") continue;
         seen.add(building.id);
 
         let entry = this.entries.get(building.id);
@@ -39,8 +44,11 @@ export class BuildingRenderer {
           entry = this.createEntry();
           this.entries.set(building.id, entry);
         }
-
-        this.sync(entry, building, selectedId === building.id);
+        if (mode === "sync") {
+          entry.container.visible = true;
+          entry.container.alpha = 1;
+          this.sync(entry, building, selectedId === building.id);
+        }
       }
     }
 
@@ -49,6 +57,31 @@ export class BuildingRenderer {
       entry.container.destroy({ children: true });
       this.entries.delete(id);
     }
+  }
+
+  private enemyMode(map: VisibilityMap, building: Building): "sync" | "freeze" | "hide" {
+    const definition = def(building.type);
+    let visible = false;
+    let explored = false;
+    for (let y = building.tileY; y < building.tileY + definition.tilesH && !visible; y += 1) {
+      for (let x = building.tileX; x < building.tileX + definition.tilesW; x += 1) {
+        if (isTileVisible(map, x, y)) {
+          visible = true;
+          break;
+        }
+        if (isTileExplored(map, x, y)) explored = true;
+      }
+    }
+    if (visible) return "sync";
+    const entry = this.entries.get(building.id);
+    if (!entry) return "hide";
+    if (explored) {
+      entry.container.visible = true;
+      entry.container.alpha = 0.6;
+      return "freeze";
+    }
+    entry.container.visible = false;
+    return "hide";
   }
 
   private createEntry(): Entry {
