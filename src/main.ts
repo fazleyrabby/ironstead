@@ -371,7 +371,7 @@ async function main(): Promise<void> {
       camera.update(dt);
       game.update(dt);
     },
-    () => {
+    (frameTime) => {
       const pending = game.state.ui.pendingBuild;
       const hover = pending && input.pointer.inside ? hoverOrigin() : undefined;
       game.state.ui.hoverTile = hover;
@@ -388,6 +388,7 @@ async function main(): Promise<void> {
         game.state.ui.selectedUnitIds,
         game.visibility.player,
         performance.now() / 1000,
+        frameTime,
       );
       projectileRenderer.update(game.state.projectiles);
       fog.update(game.visibility.player);
