@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "sweep": "vitest run src/sim/sweeps.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

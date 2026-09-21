@@ -3,6 +3,7 @@ import { DEMOLISH, demolishRefund } from "../config/demolish";
 import { PONDS } from "../config/map";
 import { GRID_COLS, GRID_ROWS } from "../config/world";
 import type { Command } from "./commands";
+import { mulberry32 } from "./rng";
 import { canPlace } from "./placement";
 import { demolishBuilding } from "./damage";
 import { def, canAfford, freeWorkerSlots, spendCost } from "./selectors";
@@ -51,7 +52,13 @@ export class Game {
   /** When true the player is also driven by the AI (test / demo mode). */
   autoPlay = false;
 
-  constructor(events: EventBus) {
+  /** Fixed timestep the simulation advances by every `update` call. */
+  readonly dt = 1 / 30;
+
+  constructor(events: EventBus, options: { seed?: number } = {}) {
+    this.events = events;
+    this.state = createInitialState();
+    this.state.rng = mulberry32(options.seed ?? 1337);
     this.events = events;
     this.state = createInitialState();
     this.nav = new NavGrid(GRID_COLS, GRID_ROWS);
@@ -62,7 +69,7 @@ export class Game {
     this.construction = new ConstructionSystem(events);
     this.movement = new MovementSystem(this.nav);
     this.production = new ProductionSystem(events, this.nav, this.movement);
-    this.combat = new CombatSystem(events, this.nav);
+    this.combat = new CombatSystem(events, this.nav, this.state.rng);
     this.hero = new HeroSystem(events);
     this.repair = new RepairSystem(events);
     this.projectiles = new ProjectileSystem(events, this.nav);

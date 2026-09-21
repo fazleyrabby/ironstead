@@ -9,6 +9,7 @@ import { isTileVisible } from "../visibility";
 import type { VisibilityMap } from "../visibility";
 import { heroAttack } from "./HeroSystem";
 import type { Building, GameState, PlayerId, Unit } from "../types";
+import type { Rng } from "../rng";
 
 const AGGRO_RANGE = 220;
 const REPATH_INTERVAL = 0.4;
@@ -19,10 +20,12 @@ type Target = { kind: "unit"; unit: Unit } | { kind: "building"; building: Build
 export class CombatSystem {
   private readonly events: EventBus;
   private readonly nav: NavGrid;
+  private readonly rng: Rng;
 
-  constructor(events: EventBus, nav: NavGrid) {
+  constructor(events: EventBus, nav: NavGrid, rng: Rng) {
     this.events = events;
     this.nav = nav;
+    this.rng = rng;
   }
 
   orderAttack(
@@ -39,7 +42,7 @@ export class CombatSystem {
       unit.targetId = targetId;
       unit.attackTimer = 0;
       // stagger first repath so a whole group doesn't run A* on the same tick
-      unit.repathTimer = Math.random() * REPATH_INTERVAL;
+      unit.repathTimer = this.rng.next() * REPATH_INTERVAL;
       unit.path = [];
       unit.state = "moving";
     }
@@ -118,7 +121,7 @@ export class CombatSystem {
           // Repath on a timer only. Do NOT retry every tick when the path is
           // empty, or stuck/blocked units run a full-grid A* 30x/s.
           if (unit.repathTimer <= 0) {
-            unit.repathTimer = REPATH_INTERVAL * (0.85 + Math.random() * 0.3);
+            unit.repathTimer = REPATH_INTERVAL * (0.85 + this.rng.next() * 0.3);
             unit.path = this.pathToTarget(unit, target);
           }
         }

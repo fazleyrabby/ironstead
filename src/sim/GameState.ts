@@ -3,6 +3,7 @@ import { MAP_LAYOUT } from "../config/map";
 import { STARTING_RESOURCES } from "../config/resources";
 import { centerOfTileRect, def, footprintWorld } from "./selectors";
 import { unitDef } from "./selectors";
+import { mulberry32 } from "./rng";
 import type {
   Building,
   BuildingType,
@@ -103,6 +104,7 @@ export function createInitialState(): GameState {
       playerBuildingsDestroyed: 0,
     },
     nextId: 1,
+    rng: mulberry32(1337),
   };
 
   for (const id of ["player", "enemy"] as const) {

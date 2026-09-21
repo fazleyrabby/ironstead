@@ -94,6 +94,7 @@ export interface Projectile {
 }
 
 import type { ResearchLine } from "../config/research";
+import type { Rng } from "./rng";
 
 export interface PlayerState {
   id: PlayerId;
@@ -129,4 +130,7 @@ export interface GameState {
   ui: UiState;
   stats: GameStats;
   nextId: number;
+  /** Seeded RNG used by every systems that needs randomness, so a match
+   *  with the same `seed` and the same inputs is byte-for-byte reproducible. */
+  rng: Rng;
 }

@@ -5,6 +5,19 @@ import { spawnUnit } from "./GameState";
 
 const DT = 1 / 30; // fixed simulation step
 
+function snapshot(game: Game) {
+  const { player, enemy } = game.state.players;
+  return {
+    playerUnits: player.units.map((u) => u.id + u.x.toFixed(2) + u.y.toFixed(2) + u.hp.toFixed(3) + u.state),
+    enemyUnits: enemy.units.map((u) => u.id + u.x.toFixed(2) + u.y.toFixed(2) + u.hp.toFixed(3) + u.state),
+    playerBuildings: player.buildings.length,
+    enemyBuildings: enemy.buildings.length,
+    stats: game.state.stats,
+    status: game.state.status,
+    time: Math.floor(game.state.time * 1000),
+  };
+}
+
 /** Bounded per-side headroom above maxVillagers(9)+maxArmy(24)+hero. */
 const ENTITY_CAP = 120;
 
@@ -15,7 +28,7 @@ const ENTITY_CAP = 120;
  */
 describe("full-game soak (AI vs AI)", () => {
   it("runs a long match and keeps state finite and bounded", () => {
-    const game = new Game(new EventBus());
+    const game = new Game(new EventBus(), { seed: 1337 });
     game.autoPlay = true;
 
     const maxSteps = 30 * 60 * 6; // cap at 6 simulated minutes
@@ -62,8 +75,24 @@ describe("full-game soak (AI vs AI)", () => {
     );
   }, 180_000);
 
+  it("seeded matches are byte-for-byte reproducible", () => {
+    const first = new Game(new EventBus(), { seed: 4242 });
+    first.autoPlay = true;
+    const maxSteps = 30 * 60 * 3; // 3 minutes
+    for (let i = 0; i < maxSteps; i += 1) first.update(DT);
+    const snapA = snapshot(first);
+
+    const second = new Game(new EventBus(), { seed: 4242 });
+    second.autoPlay = true;
+    for (let i = 0; i < maxSteps; i += 1) second.update(DT);
+    const snapB = snapshot(second);
+
+    expect(snapA).toEqual(snapB);
+    expect(snapA.status).toMatch(/victory|defeat|playing/);
+  }, 180_000);
+
   it("reaps dead units and destroyed buildings so arrays stay bounded", () => {
-    const game = new Game(new EventBus());
+    const game = new Game(new EventBus(), { seed: 1337 });
     const player = game.state.players.player;
 
     for (let i = 0; i < 200; i += 1) {
