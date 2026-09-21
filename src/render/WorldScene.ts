@@ -201,8 +201,11 @@ export function buildWorldScene(world: Container): Container {
     }
     if (blockedAt(x, y, 260, 130)) continue;
     const autumn = rand() < 0.14;
-    if (rand() < 0.5) drawRoundTree(decor, x, y, 13 + rand() * 9, autumn);
-    else drawPine(decor, x, y, 12 + rand() * 8);
+    const treeRoll = rand();
+    if (treeRoll < 0.38) drawRoundTree(decor, x, y, 13 + rand() * 9, autumn);
+    else if (treeRoll < 0.72) drawPine(decor, x, y, 12 + rand() * 8);
+    else if (treeRoll < 0.88) drawBirchTree(decor, x, y, 13 + rand() * 8);
+    else drawDeadTree(decor, x, y, 11 + rand() * 7);
   }
 
   for (let c = 0; c < 60; c += 1) {
@@ -216,8 +219,9 @@ export function buildWorldScene(world: Container): Container {
       const x = cx + Math.cos(a) * d;
       const y = cy + Math.sin(a) * d;
       if (blockedAt(x, y, 270, 125)) continue;
-      if (rand() < 0.72) drawRoundTree(decor, x, y, 12 + rand() * 9, rand() < 0.16);
-      else drawPine(decor, x, y, 11 + rand() * 8);
+      if (rand() < 0.55) drawRoundTree(decor, x, y, 12 + rand() * 9, rand() < 0.16);
+      else if (rand() < 0.7) drawPine(decor, x, y, 11 + rand() * 8);
+      else drawBirchTree(decor, x, y, 12 + rand() * 7);
     }
   }
 
@@ -226,10 +230,12 @@ export function buildWorldScene(world: Container): Container {
     const y = 80 + rand() * (WORLD_HEIGHT - 160);
     if (blockedAt(x, y, 260, 120)) continue;
     const roll = rand();
-    if (roll < 0.32) drawBush(decor, x, y, 5 + rand() * 4);
-    else if (roll < 0.58) drawRock(decor, x, y, 4 + rand() * 5);
-    else if (roll < 0.76) drawStump(decor, x, y, 4 + rand() * 3);
-    else if (roll < 0.88) drawMushroom(decor, x, y, 4 + rand() * 3);
+    if (roll < 0.24) drawBush(decor, x, y, 5 + rand() * 4);
+    else if (roll < 0.42) drawRock(decor, x, y, 4 + rand() * 5);
+    else if (roll < 0.54) drawBoulder(decor, x, y, 6 + rand() * 6);
+    else if (roll < 0.66) drawStump(decor, x, y, 4 + rand() * 3);
+    else if (roll < 0.78) drawMushroom(decor, x, y, 4 + rand() * 3);
+    else if (roll < 0.88) drawTallGrass(decor, x, y, 5 + rand() * 4);
     else drawRoundTree(decor, x, y, 11 + rand() * 7, true);
   }
 
@@ -255,7 +261,11 @@ export function buildWorldScene(world: Container): Container {
     const x = rand() * WORLD_WIDTH;
     const y = rand() * WORLD_HEIGHT;
     if (Math.abs(y - roadY) < 90 || inPond(x, y, 0.6)) continue;
-    drawFlower(decor, x, y);
+    const fRoll = rand();
+    if (fRoll < 0.4) drawFlower(decor, x, y, STYLE.flowerWhite);
+    else if (fRoll < 0.65) drawFlower(decor, x, y, STYLE.flowerYellow);
+    else if (fRoll < 0.85) drawFlower(decor, x, y, STYLE.flowerPink);
+    else drawFlower(decor, x, y, STYLE.flowerWhite);
   }
 
   terrainLayer.addChild(terrain, territory, decor);
@@ -349,11 +359,69 @@ function drawMushroom(g: Graphics, x: number, y: number, size: number): void {
   g.circle(x + size * 0.13, y - size * 0.08, size * 0.07).fill(0xffffff);
 }
 
-function drawFlower(g: Graphics, x: number, y: number): void {
-  g.circle(x - 3, y, 1.9).fill(STYLE.flowerWhite);
-  g.circle(x + 3, y, 1.9).fill(STYLE.flowerWhite);
-  g.circle(x, y - 3, 1.9).fill(STYLE.flowerWhite);
+function drawFlower(g: Graphics, x: number, y: number, color: number = STYLE.flowerWhite): void {
+  g.circle(x - 3, y, 1.9).fill(color);
+  g.circle(x + 3, y, 1.9).fill(color);
+  g.circle(x, y - 3, 1.9).fill(color);
   g.circle(x, y + 1, 1.1).fill(STYLE.flowerYellow);
+}
+
+function drawBirchTree(g: Graphics, x: number, y: number, size: number): void {
+  groundShadow(g, x, y + size * 0.42, size * 0.58, size * 0.24);
+  inkRect(g, x - size * 0.08, y - size * 0.1, size * 0.16, size * 0.54, 0xf0ebe0, size * 0.04, 1.6);
+  g.rect(x - size * 0.06, y + size * 0.02, size * 0.03, size * 0.08).fill({ color: 0x3a3a3a, alpha: 0.5 });
+  g.rect(x + size * 0.02, y + size * 0.14, size * 0.04, size * 0.06).fill({ color: 0x3a3a3a, alpha: 0.4 });
+  inkPoly(g, blobPoints(x, y - size * 0.48, size * 0.56, 5), STYLE.leafLight, 2);
+  g.ellipse(x - size * 0.18, y - size * 0.68, size * 0.2, size * 0.12).fill({
+    color: 0xffffff,
+    alpha: 0.3,
+  });
+}
+
+function drawDeadTree(g: Graphics, x: number, y: number, size: number): void {
+  groundShadow(g, x, y + size * 0.4, size * 0.5, size * 0.18);
+  inkRect(g, x - size * 0.1, y - size * 0.05, size * 0.2, size * 0.48, STYLE.woodDark, size * 0.04, 1.6);
+  g.moveTo(x - size * 0.06, y - size * 0.05)
+    .lineTo(x - size * 0.4, y - size * 0.45)
+    .stroke({ width: 2, color: STYLE.woodDark });
+  g.moveTo(x - size * 0.4, y - size * 0.45)
+    .lineTo(x - size * 0.5, y - size * 0.62)
+    .stroke({ width: 1.4, color: STYLE.woodDark });
+  g.moveTo(x + size * 0.06, y + size * 0.05)
+    .lineTo(x + size * 0.35, y - size * 0.3)
+    .stroke({ width: 1.8, color: STYLE.woodDark });
+  g.moveTo(x + size * 0.35, y - size * 0.3)
+    .lineTo(x + size * 0.28, y - size * 0.48)
+    .stroke({ width: 1.2, color: STYLE.woodDark });
+  g.moveTo(x, y - size * 0.05)
+    .lineTo(x + size * 0.08, y - size * 0.55)
+    .stroke({ width: 1.6, color: STYLE.woodDark });
+}
+
+function drawBoulder(g: Graphics, x: number, y: number, size: number): void {
+  groundShadow(g, x, y + size * 0.5, size * 0.8, size * 0.28);
+  inkPoly(
+    g,
+    [x - size * 0.8, y + size * 0.45, x - size * 0.5, y - size * 0.4, x + size * 0.1, y - size * 0.55, x + size * 0.7, y - size * 0.3, x + size * 0.85, y + size * 0.45],
+    STYLE.stone,
+    2,
+  );
+  g.poly([x - size * 0.5, y - size * 0.4, x + size * 0.1, y - size * 0.55, x + size * 0.15, y - size * 0.1, x - size * 0.3, y - size * 0.05]).fill(
+    STYLE.stoneLight,
+  );
+  g.ellipse(x - size * 0.2, y - size * 0.25, size * 0.15, size * 0.08).fill({ color: STYLE.leafDark, alpha: 0.5 });
+  g.ellipse(x - size * 0.1, y - size * 0.2, size * 0.08, size * 0.05).fill({ color: STYLE.leaf, alpha: 0.4 });
+}
+
+function drawTallGrass(g: Graphics, x: number, y: number, size: number): void {
+  const blades = [[-2, 0.9], [0, 1.0], [2, 0.85], [4, 0.7]] as const;
+  for (const [dx, hf] of blades) {
+    const h = size * hf;
+    const tipX = x + dx + size * 0.15;
+    g.moveTo(x + dx, y)
+      .quadraticCurveTo(x + dx, y - h * 0.6, tipX, y - h)
+      .stroke({ width: 1.6, color: STYLE.leafDark, alpha: 0.85 });
+  }
 }
 
 function drawLily(g: Graphics, x: number, y: number, r: number): void {

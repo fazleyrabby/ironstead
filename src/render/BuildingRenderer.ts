@@ -14,13 +14,13 @@ const FACTION_COLORS: Record<PlayerId, number> = {
 };
 
 const OUTLINE = PALETTE.outline;
-const ROOF_BLUE = 0x3b6db3;
-const GOLD_NUGGET = 0xf2c14e;
-const STONE = 0xa8a29a;
-const STONE_DARK = 0x79736b;
-const WOOD_DARK = 0x5f3c1c;
-const WINDOW_LIT = 0xffd97a;
-const CANVAS_TENT = 0xe4d6b8;
+const ROOF_BLUE = STYLE.roofBlue;
+const GOLD_NUGGET = STYLE.gold;
+const STONE = STYLE.stone;
+const STONE_DARK = STYLE.stoneDark;
+const WOOD_DARK = STYLE.woodDark;
+const WINDOW_LIT = STYLE.windowLit;
+const CANVAS_TENT = STYLE.canvasTent;
 
 interface Entry {
   container: Container;
@@ -231,6 +231,15 @@ function drawCracks(g: Graphics, building: Building, count: number): void {
     }
     g.poly(points).stroke({ width: 2, color: 0x14141c, alpha: 0.75 });
   }
+
+  if (count >= 3) {
+    for (let d = 0; d < 4; d += 1) {
+      const rx = (rand() - 0.5) * w * 0.6;
+      const ry = (rand() - 0.3) * h * 0.5;
+      const rs = 1.5 + rand() * 2.5;
+      g.poly([rx - rs, ry + rs * 0.4, rx + rs * 0.6, ry + rs * 0.3, rx + rs * 0.3, ry - rs * 0.5, rx - rs * 0.4, ry - rs * 0.3]).fill({ color: STYLE.stoneDark, alpha: 0.7 });
+    }
+  }
 }
 
 function drawBody(g: Graphics, building: Building): void {
@@ -363,7 +372,9 @@ function gableRoof(g: Graphics, x: number, yApex: number, yEave: number, w: numb
 
 function door(g: Graphics, cx: number, baseY: number, w: number, h: number): void {
   g.roundRect(cx - w / 2, baseY - h, w, h, w * 0.3).fill(WOOD_DARK);
-  g.circle(cx, baseY - h, w * 0.28).fill(0xf6d76a);
+  g.roundRect(cx - w / 2, baseY - h, w, h, w * 0.3).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+  g.rect(cx - w * 0.04, baseY - h, w * 0.08, h).fill({ color: 0x000000, alpha: 0.2 });
+  g.circle(cx + w * 0.2, baseY - h * 0.45, w * 0.08).fill(STYLE.gold);
 }
 
 function windowLit(g: Graphics, cx: number, cy: number, s: number): void {
@@ -371,6 +382,28 @@ function windowLit(g: Graphics, cx: number, cy: number, s: number): void {
   g.rect(cx - s / 2, cy - 1, s, 2).fill(WOOD_DARK);
   g.rect(cx - 1, cy - s / 2, 2, s).fill(WOOD_DARK);
   g.roundRect(cx - s / 2, cy - s / 2, s, s, 2).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
+}
+
+function torch(g: Graphics, x: number, y: number, size: number): void {
+  g.rect(x - size * 0.15, y, size * 0.3, size * 0.7).fill(STYLE.woodDark);
+  g.poly([x - size * 0.25, y, x + size * 0.25, y, x, y - size * 0.6]).fill(STYLE.fire);
+  g.poly([x - size * 0.12, y, x + size * 0.12, y, x, y - size * 0.35]).fill(STYLE.fireCore);
+}
+
+function barrel(g: Graphics, x: number, y: number, w: number, h: number): void {
+  g.ellipse(x, y + h * 0.4, w * 0.5, h * 0.15).fill(STYLE.woodDark);
+  g.roundRect(x - w * 0.42, y - h * 0.3, w * 0.84, h * 0.7, w * 0.2).fill(STYLE.wood);
+  g.roundRect(x - w * 0.42, y - h * 0.3, w * 0.84, h * 0.7, w * 0.2).stroke({ width: 1.2, color: OUTLINE, alpha: 0.85 });
+  g.rect(x - w * 0.46, y - h * 0.1, w * 0.92, h * 0.06).fill(STYLE.steelDark);
+  g.rect(x - w * 0.46, y + h * 0.18, w * 0.92, h * 0.06).fill(STYLE.steelDark);
+  g.ellipse(x, y - h * 0.3, w * 0.42, h * 0.12).fill(STYLE.woodLight);
+  g.ellipse(x, y - h * 0.3, w * 0.42, h * 0.12).stroke({ width: 1, color: OUTLINE, alpha: 0.8 });
+}
+
+function smokeWisp(g: Graphics, x: number, y: number, size: number): void {
+  g.ellipse(x, y, size * 0.6, size * 0.4).fill({ color: 0xc0c0c0, alpha: 0.18 });
+  g.ellipse(x - size * 0.3, y - size * 0.5, size * 0.4, size * 0.3).fill({ color: 0xd0d0d0, alpha: 0.14 });
+  g.ellipse(x + size * 0.2, y - size * 0.9, size * 0.3, size * 0.22).fill({ color: 0xd8d8d8, alpha: 0.1 });
 }
 
 function pennant(g: Graphics, x: number, yTop: number, len: number, color: number): void {
@@ -404,6 +437,7 @@ function drawTownCenter(g: Graphics, building: Building, faction: number): void 
   g.roundRect(-towerW / 2, towerY, towerW, towerH, 5).fill(STONE);
   brickwork(g, -towerW / 2, towerY, towerW, towerH, STONE_DARK, 4);
   g.roundRect(-towerW / 2, towerY, towerW, towerH, 5).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
+  g.roundRect(-towerW / 2 + 3, towerY + 3, towerW - 6, towerH * 0.12).fill({ color: 0xffffff, alpha: 0.12 });
   const merlons = 3;
   const mw = towerW / (merlons * 2 - 1);
   for (let i = 0; i < merlons; i += 1) {
@@ -411,15 +445,18 @@ function drawTownCenter(g: Graphics, building: Building, faction: number): void 
     g.rect(mx, towerY - mw * 0.8, mw, mw * 0.8).fill(STONE);
     g.rect(mx, towerY - mw * 0.8, mw, mw * 0.8).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
   }
+  g.rect(-towerW / 2, towerY + towerH - 3, towerW, 3).fill({ color: 0x000000, alpha: 0.12 });
 
   door(g, 0, hallY + hallH, w * 0.14, h * 0.2);
   windowLit(g, -hallW * 0.3, hallY + hallH * 0.45, w * 0.07);
   windowLit(g, hallW * 0.3, hallY + hallH * 0.45, w * 0.07);
   windowLit(g, 0, towerY + towerH * 0.42, w * 0.06);
+  torch(g, -hallW * 0.48, hallY + hallH - 2, w * 0.08);
+  torch(g, hallW * 0.48, hallY + hallH - 2, w * 0.08);
 
-  pennant(g, 0, towerY - mw * 0.8 + 2, w * 0.13, faction);
-  pennant(g, -hallW / 2 + 2, hallY - h * 0.12, w * 0.1, faction);
-  pennant(g, hallW / 2 - 2, hallY - h * 0.12, w * 0.1, faction);
+  pennant(g, 0, towerY - mw * 0.8 + 2, w * 0.15, faction);
+  pennant(g, -hallW / 2 + 2, hallY - h * 0.12, w * 0.12, faction);
+  pennant(g, hallW / 2 - 2, hallY - h * 0.12, w * 0.12, faction);
 }
 
 function drawHouse(g: Graphics, building: Building, faction: number): void {
@@ -440,7 +477,7 @@ function drawHouse(g: Graphics, building: Building, faction: number): void {
   });
 
   timberWall(g, -w * 0.36, wallY, w * 0.72, wallH, 0xefe0c0, lw);
-  gableRoof(g, -w * 0.42, wallY - h * 0.32, wallY + 2, w * 0.84, 0x3b6db3, lw);
+  gableRoof(g, -w * 0.42, wallY - h * 0.32, wallY + 2, w * 0.84, STYLE.roofBlue, lw);
 
   g.rect(w * 0.15, wallY - h * 0.34, w * 0.1, h * 0.28).fill(STYLE.stone);
   g.rect(w * 0.15, wallY - h * 0.34, w * 0.1, h * 0.28).stroke({
@@ -449,9 +486,16 @@ function drawHouse(g: Graphics, building: Building, faction: number): void {
     alpha: 0.9,
   });
   g.rect(w * 0.13, wallY - h * 0.37, w * 0.14, h * 0.05).fill(STYLE.stoneDark);
+  smokeWisp(g, w * 0.2, wallY - h * 0.48, w * 0.12);
 
   door(g, -w * 0.12, baseY, w * 0.16, h * 0.26);
   windowLit(g, w * 0.18, wallY + wallH * 0.42, w * 0.12);
+
+  g.roundRect(w * 0.08, wallY + wallH * 0.72, w * 0.22, h * 0.06, 2).fill(STYLE.woodDark);
+  g.circle(w * 0.12, wallY + wallH * 0.72, w * 0.025).fill(STYLE.flowerPink);
+  g.circle(w * 0.18, wallY + wallH * 0.7, w * 0.025).fill(STYLE.flowerYellow);
+  g.circle(w * 0.24, wallY + wallH * 0.72, w * 0.025).fill(STYLE.flowerWhite);
+
   pennant(g, 0, wallY - h * 0.32 + 1, w * 0.14, faction);
 }
 
@@ -464,13 +508,14 @@ function drawFarm(g: Graphics, building: Building): void {
   g.roundRect(-w / 2, -h / 2, w, h, 8).fill(STYLE.soil);
   g.roundRect(-w / 2, -h / 2, w, h, 8).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
   g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h * 0.07, 3).fill({ color: 0xffffff, alpha: 0.07 });
+  const cropColors = [STYLE.crop, STYLE.leafLight, STYLE.cropDark];
   for (let r = 0; r < 3; r += 1) {
     const ry = -h * 0.32 + r * h * 0.3;
     g.roundRect(-w * 0.42, ry, w * 0.84, h * 0.14, 4).fill(STYLE.cropDark);
     for (let c = 0; c < 5; c += 1) {
       const cx = -w * 0.34 + c * w * 0.17;
       const cs = Math.max(2, w * 0.035);
-      g.circle(cx, ry + h * 0.07, cs).fill(STYLE.crop);
+      g.circle(cx, ry + h * 0.07, cs).fill(cropColors[(r + c) % 3]);
       g.circle(cx - cs * 0.35, ry + h * 0.045, cs * 0.4).fill({ color: 0xffffff, alpha: 0.35 });
     }
   }
@@ -488,11 +533,20 @@ function drawFarm(g: Graphics, building: Building): void {
   g.circle(-w * 0.34, h * 0.06, w * 0.05).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
   g.poly([-w * 0.4, h * 0.14, -w * 0.28, h * 0.14, -w * 0.34, h * 0.26]).fill(0xc0392b);
 
+  const sx = -w * 0.46;
+  const sy = h * 0.1;
+  g.rect(sx, sy, 2.5, h * 0.28).fill(STYLE.wood);
+  g.rect(sx - w * 0.06, sy + h * 0.06, w * 0.12, 2.5).fill(STYLE.wood);
+  g.circle(sx, sy, w * 0.03).fill(STYLE.sand);
+  g.rect(sx - 1, sy + h * 0.28, 4, 3).fill(STYLE.woodDark);
+
   for (let i = 0; i < 4; i += 1) {
     const fx = -w * 0.46 + i * w * 0.12;
     g.rect(fx, h * 0.18, 3, h * 0.22).fill(STYLE.wood);
   }
   g.rect(-w * 0.46, h * 0.24, w * 0.38, 3).fill(STYLE.wood);
+
+  barrel(g, w * 0.42, h * 0.28, w * 0.1, h * 0.12);
 }
 
 function drawStorage(g: Graphics, building: Building, faction: number): void {
@@ -510,13 +564,19 @@ function drawStorage(g: Graphics, building: Building, faction: number): void {
   g.roundRect(-w * 0.13, wallY + wallH - h * 0.24, w * 0.26, h * 0.24, 3).fill(STYLE.woodDark);
   g.rect(-w * 0.13, wallY + wallH - h * 0.13, w * 0.26, 2).fill({ color: faction, alpha: 0.9 });
 
-  g.roundRect(-w * 0.44, h * 0.22, w * 0.2, h * 0.16, 2).fill(STYLE.sand);
-  g.roundRect(-w * 0.44, h * 0.22, w * 0.2, h * 0.16, 2).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
-  g.rect(-w * 0.44, h * 0.28, w * 0.2, 2).fill(STYLE.woodDark);
-  g.circle(w * 0.34, h * 0.3, w * 0.1).fill(STYLE.wood);
-  g.circle(w * 0.34, h * 0.3, w * 0.1).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
-  g.rect(w * 0.24, h * 0.26, w * 0.2, 2.5).fill(STYLE.woodDark);
-  g.rect(w * 0.24, h * 0.34, w * 0.2, 2.5).fill(STYLE.woodDark);
+  barrel(g, -w * 0.38, h * 0.28, w * 0.12, h * 0.14);
+  barrel(g, -w * 0.24, h * 0.3, w * 0.11, h * 0.12);
+
+  g.roundRect(w * 0.22, h * 0.22, w * 0.18, h * 0.14, 2).fill(STYLE.woodLight);
+  g.roundRect(w * 0.22, h * 0.22, w * 0.18, h * 0.14, 2).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
+  g.rect(w * 0.22, h * 0.28, w * 0.18, 2).fill(STYLE.woodDark);
+  g.roundRect(w * 0.25, h * 0.12, w * 0.14, h * 0.12, 2).fill(STYLE.woodLight);
+  g.roundRect(w * 0.25, h * 0.12, w * 0.14, h * 0.12, 2).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+
+  g.rect(0, wallY - h * 0.2, 2, h * 0.14).fill(STYLE.woodDark);
+  g.circle(0, wallY - h * 0.22, w * 0.03).fill(STYLE.steelDark);
+  g.moveTo(-w * 0.06, wallY - h * 0.08).lineTo(0, wallY - h * 0.2).lineTo(w * 0.06, wallY - h * 0.08).stroke({ width: 1.4, color: STYLE.woodDark });
+
   pennant(g, 0, wallY - h * 0.26 + 2, w * 0.12, faction);
 }
 
@@ -526,7 +586,6 @@ function drawCamp(g: Graphics, building: Building, faction: number): void {
   const lw = line(w);
   shadow(g, w, h);
 
-  // rectangular dirt training yard
   const padW = w * 0.94;
   const padH = h * 0.9;
   const top = -padH / 2;
@@ -537,7 +596,6 @@ function drawCamp(g: Graphics, building: Building, faction: number): void {
     alpha: 0.32,
   });
 
-  // timber palisade along the back edge with a rail
   const posts = 7;
   for (let i = 0; i < posts; i += 1) {
     const px = -padW * 0.46 + i * ((padW * 0.92) / (posts - 1));
@@ -547,21 +605,19 @@ function drawCamp(g: Graphics, building: Building, faction: number): void {
   }
   g.rect(-padW * 0.46, top - h * 0.02, padW * 0.92, 3).fill(STYLE.woodDark);
 
-  // tents
   tent(g, -w * 0.2, h * 0.24, w * 0.3, h * 0.32, lw);
   tent(g, w * 0.22, h * 0.28, w * 0.24, h * 0.26, lw);
 
-  // campfire: ring of stones + flame
   const fx = w * 0.02;
   const fy = h * 0.06;
   g.ellipse(fx, fy, w * 0.09, h * 0.05).fill(STYLE.stoneDark);
   g.circle(fx - w * 0.06, fy + h * 0.01, w * 0.022).fill(STYLE.stone);
   g.circle(fx + w * 0.06, fy + h * 0.015, w * 0.022).fill(STYLE.stone);
   g.circle(fx, fy - h * 0.04, w * 0.022).fill(STYLE.stone);
-  g.poly([fx - 5, fy + 2, fx + 5, fy + 2, fx, fy - h * 0.12]).fill(0xf08a2d);
-  g.poly([fx - 2.5, fy + 2, fx + 2.5, fy + 2, fx, fy - h * 0.07]).fill(0xf6d76a);
+  g.poly([fx - 5, fy + 2, fx + 5, fy + 2, fx, fy - h * 0.12]).fill(STYLE.fire);
+  g.poly([fx - 2.5, fy + 2, fx + 2.5, fy + 2, fx, fy - h * 0.07]).fill(STYLE.fireCore);
+  smokeWisp(g, fx, fy - h * 0.16, w * 0.06);
 
-  // weapon rack: two posts with a rail and leaning spears
   const rx = -w * 0.4;
   const ry = h * 0.1;
   g.rect(rx, ry, 3, h * 0.24).fill(STYLE.woodDark);
@@ -574,15 +630,21 @@ function drawCamp(g: Graphics, building: Building, faction: number): void {
   g.rect(rx + w * 0.11, ry - h * 0.06, 2, h * 0.12).fill(STYLE.wood);
   g.rect(rx + w * 0.11 - 3, ry - h * 0.09, 6, 2.4).fill(STYLE.stoneDark);
 
-  // training dummy
+  const shx = rx + w * 0.04;
+  const shy = ry + h * 0.08;
+  g.circle(shx, shy, w * 0.035).fill(faction);
+  g.circle(shx, shy, w * 0.035).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+  g.circle(shx + w * 0.08, shy + h * 0.02, w * 0.03).fill(shade(faction, -0.2));
+  g.circle(shx + w * 0.08, shy + h * 0.02, w * 0.03).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+
   const dx = w * 0.4;
   const dy = h * 0.34;
   g.rect(dx - 1.5, dy - h * 0.18, 3, h * 0.2).fill(STYLE.woodDark);
   g.rect(dx - w * 0.05, dy - h * 0.14, w * 0.1, 3).fill(STYLE.woodDark);
   g.circle(dx, dy - h * 0.2, w * 0.04).fill(STYLE.sand);
   g.circle(dx, dy - h * 0.2, w * 0.04).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
+  g.circle(dx, dy - h * 0.2, w * 0.02).fill({ color: 0xef4444, alpha: 0.7 });
 
-  // banner
   g.rect(w * 0.44 - 1.5, top - h * 0.34, 3, h * 0.34).fill(STYLE.woodDark);
   pennant(g, w * 0.44, top - h * 0.32, w * 0.13, faction);
 }
@@ -619,6 +681,9 @@ function drawTower(g: Graphics, building: Building, faction: number): void {
   );
   g.rect(-baseW / 2 + 2, 0, baseW - 4, 3).fill({ color: 0x000000, alpha: 0.15 });
 
+  g.roundRect(-w * 0.08, h * 0.02, w * 0.16, h * 0.12, 2).fill({ color: 0x000000, alpha: 0.4 });
+  g.roundRect(-w * 0.08, -h * 0.18, w * 0.16, h * 0.12, 2).fill({ color: 0x000000, alpha: 0.4 });
+
   g.roundRect(-w * 0.42, -h * 0.48, w * 0.84, h * 0.24, 2).fill(STYLE.woodLight);
   g.roundRect(-w * 0.42, -h * 0.48, w * 0.84, h * 0.24, 2).stroke({
     width: lw,
@@ -632,6 +697,7 @@ function drawTower(g: Graphics, building: Building, faction: number): void {
   }
 
   windowLit(g, 0, h * 0.1, Math.max(4, w * 0.16));
+  torch(g, w * 0.28, h * 0.18, Math.max(3, w * 0.1));
   g.rect(-1.5, -h * 0.48 - 16, 3, 16).fill(STYLE.woodDark);
   g.poly([1.5, -h * 0.48 - 16, 1.5 + w * 0.3, -h * 0.48 - 12, 1.5, -h * 0.48 - 8]).fill(faction);
 }
@@ -656,6 +722,8 @@ function drawAcademy(g: Graphics, building: Building, faction: number): void {
       color: OUTLINE,
       alpha: 0.9,
     });
+    g.roundRect(cx - w * 0.05, hallY - h * 0.02, w * 0.1, h * 0.04, 2).fill(STYLE.stone);
+    g.roundRect(cx - w * 0.05, hallY + hallH, w * 0.1, h * 0.04, 2).fill(STYLE.stone);
   }
 
   g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).fill(ROOF_BLUE);
@@ -664,8 +732,15 @@ function drawAcademy(g: Graphics, building: Building, faction: number): void {
     color: OUTLINE,
     alpha: 0.9,
   });
-  g.circle(0, hallY - h * 0.1, w * 0.055).fill(STYLE.stoneLight);
-  g.circle(0, hallY - h * 0.1, w * 0.055).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
+
+  g.circle(0, hallY - h * 0.1, w * 0.065).fill(STYLE.stoneLight);
+  g.circle(0, hallY - h * 0.1, w * 0.065).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
+  g.circle(0, hallY - h * 0.1, w * 0.04).stroke({ width: 1, color: STYLE.stoneDark, alpha: 0.5 });
+
+  g.roundRect(-w * 0.08, hallY - h * 0.2, w * 0.16, h * 0.07, 2).fill(STYLE.sand);
+  g.roundRect(-w * 0.08, hallY - h * 0.2, w * 0.16, h * 0.07, 2).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+  g.moveTo(-w * 0.04, hallY - h * 0.16).lineTo(w * 0.04, hallY - h * 0.16).stroke({ width: 0.8, color: OUTLINE, alpha: 0.4 });
+  g.moveTo(-w * 0.03, hallY - h * 0.15).lineTo(w * 0.05, hallY - h * 0.15).stroke({ width: 0.8, color: OUTLINE, alpha: 0.4 });
 
   door(g, 0, hallY + hallH, w * 0.15, h * 0.22);
   windowLit(g, -hallW * 0.32, hallY + hallH * 0.55, w * 0.08);
@@ -689,6 +764,10 @@ function drawWall(g: Graphics, building: Building): void {
   }
   g.roundRect(-w / 2, -h / 2, w, h, 3).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
   g.rect(-w / 2 + 3, h * 0.1, w - 6, 3).fill({ color: 0x000000, alpha: 0.12 });
+
+  if (w > 30) {
+    torch(g, 0, -h * 0.1, Math.max(3, w * 0.12));
+  }
 }
 
 function drawForest(g: Graphics, building: Building): void {

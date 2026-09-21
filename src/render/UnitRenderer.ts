@@ -6,6 +6,7 @@ import type { VisibilityMap } from "../sim/visibility";
 import type { GameState, PlayerId, Unit } from "../sim/types";
 import { UNIT_FRAMES, unitTexture, USE_SPRITE_ASSETS } from "./Assets";
 import { softShadowTexture } from "./softShadow";
+import { STYLE } from "./style";
 
 const FACTION_COLORS: Record<PlayerId, number> = {
   player: PALETTE.playerUnit,
@@ -13,15 +14,15 @@ const FACTION_COLORS: Record<PlayerId, number> = {
 };
 
 const OUTLINE = PALETTE.outline;
-const SKIN = 0xf0c49a;
-const SKIN_DARK = 0xd39b6e;
-const STEEL = 0xc3ccd8;
-const STEEL_DARK = 0x7c8794;
-const LEATHER = 0x6b4a2a;
-const WOOD = 0x8a5a2b;
-const GOLD = 0xf2c14e;
-const HORSE = 0x7a5230;
-const HORSE_DARK = 0x54371d;
+const SKIN = STYLE.skin;
+const SKIN_DARK = STYLE.skinDark;
+const STEEL = STYLE.steel;
+const STEEL_DARK = STYLE.steelDark;
+const LEATHER = STYLE.leather;
+const WOOD = STYLE.wood;
+const GOLD = STYLE.gold;
+const HORSE = STYLE.horse;
+const HORSE_DARK = STYLE.horseDark;
 
 type AttackKind = "slash" | "thrust" | "shoot" | "tool" | "cavalry";
 type HeadGear = "hood" | "helm" | "cap" | "crown" | "bare";
@@ -285,18 +286,27 @@ export class UnitRenderer {
     const swing = anim.move * sin;
     const bob = Math.abs(cos) * anim.move;
 
-    // step dust: spawn near foot contact
     if (moving && Math.abs(cos) > 0.96 && unit.type !== "horse_rider") anim.dust = 1;
+    if (anim.attack > 0.82 && anim.attack < 0.92) anim.dust = Math.max(anim.dust, 0.7);
 
-    const attackK = Math.sin(anim.attack * Math.PI);
-    const lunge = attackK * (rig.attackKind === "thrust" || rig.attackKind === "cavalry" ? 4 : 2.5);
+    const prevFacing = anim.facing;
+    const dx2 = unit.x - anim.lastX;
+    if (Math.abs(dx2) > 1.5) {
+      const newFace = dx2 > 0 ? 1 : -1;
+      if (newFace !== prevFacing && moving) anim.dust = Math.max(anim.dust, 0.6);
+    }
+
+    const attackPhase = anim.attack * Math.PI;
+    const windUp = Math.max(0, Math.sin(attackPhase * 0.7)) * (anim.attack < 0.4 ? 1 : 0);
+    const attackK = Math.sin(attackPhase);
+    const followThrough = Math.max(0, -Math.sin(attackPhase + 0.6)) * 0.3;
+    const lunge = (attackK + followThrough) * (rig.attackKind === "thrust" || rig.attackKind === "cavalry" ? 4 : 2.5);
 
     rig.root.scale.set(anim.facing, 1);
     rig.body.x = lunge;
     rig.body.y = -bob * 0.95;
-    rig.body.rotation = 0.05 * anim.move + attackK * 0.07;
+    rig.body.rotation = 0.05 * anim.move + attackK * 0.07 - windUp * 0.12;
 
-    // gather/tool motion for villagers
     const gatherK = Math.sin(nowSec * 6.5) * anim.gather;
 
     if (rig.horse) {
@@ -304,8 +314,7 @@ export class UnitRenderer {
       rig.horse.legFront.rotation = 0.6 * gallop * (0.3 + anim.move * 0.9);
       rig.horse.legBack.rotation = 0.6 * -gallop * (0.3 + anim.move * 0.9);
       rig.horse.body.y = -Math.abs(gallop) * 1.8 * anim.move;
-      // rider couches the lance, thrusting on attack
-      rig.armFront.rotation = 0.15 + attackK * 1.0;
+      rig.armFront.rotation = 0.15 + attackK * 1.0 - windUp * 0.4;
       rig.armBack.rotation = 0.45 - attackK * 0.3;
     } else {
       rig.legFront.rotation = rig.walkSwing * swing;
@@ -314,15 +323,15 @@ export class UnitRenderer {
       if (rig.twoHanded) {
         rig.armFront.rotation = 0.35 + rig.armSwing * 0.18 * swing;
         rig.armBack.rotation = 0.85 + rig.armSwing * 0.18 * -swing;
-        if (rig.attackKind === "shoot") rig.armFront.rotation += attackK * 0.25;
+        if (rig.attackKind === "shoot") rig.armFront.rotation += attackK * 0.25 - windUp * 0.3;
       } else if (rig.attackKind === "thrust") {
-        rig.armFront.rotation = rig.armSpread - 0.9 * attackK + rig.armSwing * -swing * 0.4;
+        rig.armFront.rotation = rig.armSpread - 0.9 * attackK + windUp * 0.5 + rig.armSwing * -swing * 0.4;
         rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.5;
       } else if (rig.attackKind === "slash") {
-        rig.armFront.rotation = rig.armSpread - 1.7 * attackK + rig.armSwing * -swing * 0.4;
+        rig.armFront.rotation = rig.armSpread - 1.7 * attackK + windUp * 0.6 + rig.armSwing * -swing * 0.4;
         rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.5;
       } else if (rig.attackKind === "tool") {
-        rig.armFront.rotation = rig.armSpread - 1.3 * attackK - gatherK * 1.1;
+        rig.armFront.rotation = rig.armSpread - 1.3 * attackK - gatherK * 1.1 + windUp * 0.4;
         rig.armBack.rotation = -rig.armSpread + rig.armSwing * swing * 0.4;
       } else {
         rig.armFront.rotation = rig.armSpread + rig.armSwing * -swing;
@@ -330,12 +339,12 @@ export class UnitRenderer {
       }
     }
 
-    // secondary motion: torso squash + head follow-through
-    const breathe = Math.sin(nowSec * 2.2) * 0.02;
+    const idle = 1 - anim.move;
+    const breathe = Math.sin(nowSec * 2.2) * (0.02 + idle * 0.025);
     rig.torso.y = -bob * 0.25;
-    rig.torso.scale.set(1 + breathe * 0.4 - bob * 0.02, 1 - breathe + bob * 0.035);
-    rig.head.y = -bob * 0.15 - r * 0.02;
-    rig.head.rotation = Math.sin(anim.phase - 0.5) * 0.07 * anim.move + attackK * 0.05;
+    rig.torso.scale.set(1 + breathe * 0.5 - bob * 0.025, 1 - breathe * 1.2 + bob * 0.04);
+    rig.head.y = -bob * 0.15 - r * 0.02 + idle * Math.sin(nowSec * 1.6) * 0.3;
+    rig.head.rotation = Math.sin(anim.phase - 0.5) * 0.07 * anim.move + attackK * 0.05 + idle * Math.sin(nowSec * 1.8) * 0.035;
 
     this.drawFx(entry, r, anim);
   }
@@ -356,7 +365,7 @@ export class UnitRenderer {
     if (anim.dust > 0.01) {
       const dx = -anim.facing * r * 0.6;
       g.ellipse(dx, r * 1.15, r * 0.5 * (1.4 - anim.dust), r * 0.24 * (1.4 - anim.dust)).fill({
-        color: 0xe6dcc0,
+        color: STYLE.dust,
         alpha: 0.45 * anim.dust,
       });
     }
@@ -405,22 +414,35 @@ function arm(color: number, skin: number, length: number, width: number): Graphi
   return g;
 }
 
-function torsoGraphic(r: number, tunic: number, cape: number | undefined): Graphics {
+function torsoGraphic(r: number, tunic: number, cape: number | undefined, gear?: "pauldron" | "belt"): Graphics {
   const g = new Graphics();
   const w = r * 1.08;
   const h = r * 0.98;
   if (cape !== undefined) {
-    g.poly([-w * 0.6, -h * 0.1, w * 0.6, -h * 0.1, w * 0.36, h * 1.0, -w * 0.36, h * 1.0]).fill(cape);
-    g.poly([-w * 0.6, -h * 0.1, w * 0.6, -h * 0.1, w * 0.36, h * 1.0, -w * 0.36, h * 1.0]).stroke({
+    g.poly([-w * 0.7, -h * 0.08, w * 0.7, -h * 0.08, w * 0.42, h * 1.15, -w * 0.42, h * 1.15]).fill(cape);
+    g.poly([-w * 0.7, -h * 0.08, w * 0.7, -h * 0.08, w * 0.42, h * 1.15, -w * 0.42, h * 1.15]).stroke({
       width: 1.8,
       color: OUTLINE,
       alpha: 0.85,
     });
+    g.poly([-w * 0.7, -h * 0.08, -w * 0.1, -h * 0.08, -w * 0.12, h * 0.5, -w * 0.52, h * 0.6]).fill({ color: shade(cape, 0.15), alpha: 0.4 });
   }
   g.roundRect(-w / 2, -h / 2, w, h, r * 0.42).fill(tunic);
   g.roundRect(-w / 2, -h / 2, w, h, r * 0.42).stroke({ width: 2.1, color: OUTLINE, alpha: 0.9 });
   g.roundRect(-w / 2, h * 0.16, w, h * 0.16, r * 0.1).fill(shade(tunic, -0.35));
   g.ellipse(-w * 0.22, -h * 0.2, w * 0.26, h * 0.22).fill({ color: shade(tunic, 0.3), alpha: 0.45 });
+  if (gear === "pauldron") {
+    g.ellipse(-w * 0.52, -h * 0.36, w * 0.22, h * 0.18).fill(STEEL);
+    g.ellipse(-w * 0.52, -h * 0.36, w * 0.22, h * 0.18).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+    g.ellipse(-w * 0.52, -h * 0.44, w * 0.14, h * 0.08).fill({ color: shade(STEEL, 0.3), alpha: 0.5 });
+    g.ellipse(w * 0.52, -h * 0.36, w * 0.22, h * 0.18).fill(STEEL_DARK);
+    g.ellipse(w * 0.52, -h * 0.36, w * 0.22, h * 0.18).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+  } else if (gear === "belt") {
+    g.roundRect(-w * 0.48, h * 0.02, w * 0.96, h * 0.12, r * 0.06).fill(LEATHER);
+    g.roundRect(-w * 0.48, h * 0.02, w * 0.96, h * 0.12, r * 0.06).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+    g.roundRect(w * 0.12, h * 0.0, h * 0.16, h * 0.16, r * 0.04).fill(shade(LEATHER, -0.2));
+    g.roundRect(w * 0.12, h * 0.0, h * 0.16, h * 0.16, r * 0.04).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+  }
   return g;
 }
 
@@ -454,30 +476,36 @@ function headGraphic(r: number, faction: number, gear: HeadGear): Graphics {
     });
   } else if (gear === "helm") {
     dome(STEEL);
-    g.rect(-hr * 1.08, -hr * 0.16, hr * 2.16, hr * 0.2).fill(STEEL_DARK);
+    g.ellipse(0, -hr * 0.06, hr * 1.08, hr * 0.12).fill(STEEL_DARK);
     g.rect(-hr * 0.1, -hr * 0.1, hr * 0.2, hr * 0.75).fill(STEEL_DARK);
-    g.poly([-hr * 0.12, -hr * 1.1, hr * 0.12, -hr * 1.1, 0, -hr * 1.55]).fill(STEEL_DARK);
+    g.ellipse(-hr * 0.4, -hr * 0.6, hr * 0.3, hr * 0.18).fill({ color: shade(STEEL, 0.25), alpha: 0.45 });
+    g.poly([-hr * 0.14, -hr * 1.1, hr * 0.14, -hr * 1.1, 0, -hr * 1.6]).fill(STEEL_DARK);
+    g.poly([-hr * 0.14, -hr * 1.1, hr * 0.14, -hr * 1.1, 0, -hr * 1.6]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.75 });
   } else if (gear === "cap") {
     dome(LEATHER);
-    g.rect(-hr * 1.12, -hr * 0.18, hr * 2.24, hr * 0.18).fill(shade(LEATHER, -0.25));
-    g.poly([hr * 0.55, -hr * 1.0, hr * 1.9, -hr * 1.8, hr * 1.05, -hr * 0.55]).fill(0xc792ea);
-    g.poly([hr * 0.55, -hr * 1.0, hr * 1.9, -hr * 1.8, hr * 1.05, -hr * 0.55]).stroke({
+    g.rect(-hr * 1.16, -hr * 0.2, hr * 2.32, hr * 0.2).fill(shade(LEATHER, -0.25));
+    g.ellipse(-hr * 0.4, -hr * 0.55, hr * 0.28, hr * 0.15).fill({ color: shade(LEATHER, 0.2), alpha: 0.4 });
+    g.poly([hr * 0.5, -hr * 1.05, hr * 2.0, -hr * 1.85, hr * 1.1, -hr * 0.55]).fill(0xc792ea);
+    g.poly([hr * 0.5, -hr * 1.05, hr * 2.0, -hr * 1.85, hr * 1.1, -hr * 0.55]).stroke({
       width: 1.2,
       color: OUTLINE,
       alpha: 0.7,
     });
+    g.poly([hr * 0.55, -hr * 1.05, hr * 1.85, -hr * 1.8, hr * 1.6, -hr * 1.55]).fill({ color: shade(0xc792ea, 0.25), alpha: 0.5 });
   } else if (gear === "crown") {
     dome(shade(faction, -0.2));
-    g.rect(-hr * 0.95, -hr * 1.2, hr * 1.9, hr * 0.36).fill(GOLD);
-    g.rect(-hr * 0.95, -hr * 1.2, hr * 1.9, hr * 0.36).stroke({ width: 1.5, color: OUTLINE, alpha: 0.85 });
-    for (const px of [-hr * 0.65, 0, hr * 0.65]) {
-      g.poly([px - hr * 0.18, -hr * 1.2, px + hr * 0.18, -hr * 1.2, px, -hr * 1.72]).fill(GOLD);
+    g.rect(-hr * 1.0, -hr * 1.25, hr * 2.0, hr * 0.4).fill(GOLD);
+    g.rect(-hr * 1.0, -hr * 1.25, hr * 2.0, hr * 0.4).stroke({ width: 1.5, color: OUTLINE, alpha: 0.85 });
+    g.rect(-hr * 1.0, -hr * 1.25, hr * 2.0, hr * 0.12).fill({ color: shade(GOLD, 0.35), alpha: 0.5 });
+    for (const px of [-hr * 0.7, 0, hr * 0.7]) {
+      g.poly([px - hr * 0.2, -hr * 1.25, px + hr * 0.2, -hr * 1.25, px, -hr * 1.8]).fill(GOLD);
+      g.poly([px - hr * 0.2, -hr * 1.25, px + hr * 0.2, -hr * 1.25, px, -hr * 1.8]).stroke({ width: 1.1, color: OUTLINE, alpha: 0.7 });
     }
-    g.circle(0, -hr * 1.02, hr * 0.14).fill(0x9b1c2e);
+    g.circle(0, -hr * 1.08, hr * 0.16).fill(0x9b1c2e);
+    g.circle(-hr * 0.06, -hr * 1.12, hr * 0.06).fill({ color: 0xffffff, alpha: 0.6 });
   } else {
-    dome(0x6b4a2a);
+    dome(LEATHER);
   }
-
   g.circle(-hr * 0.34, hr * 0.12, hr * 0.13).fill(OUTLINE);
   g.circle(hr * 0.34, hr * 0.12, hr * 0.13).fill(OUTLINE);
   return g;
@@ -500,6 +528,25 @@ function headGear(type: Unit["type"]): HeadGear {
   }
 }
 
+function shieldGraphic(r: number, kind: "kite" | "round", color: number): Graphics {
+  const g = new Graphics();
+  if (kind === "kite") {
+    g.poly([-r * 0.4, -r * 0.5, r * 0.4, -r * 0.5, r * 0.3, r * 0.4, 0, r * 0.75, -r * 0.3, r * 0.4]).fill(color);
+    g.poly([-r * 0.4, -r * 0.5, r * 0.4, -r * 0.5, r * 0.3, r * 0.4, 0, r * 0.75, -r * 0.3, r * 0.4]).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
+    g.poly([-r * 0.4, -r * 0.5, -r * 0.1, -r * 0.5, -r * 0.05, r * 0.3, -r * 0.3, r * 0.4]).fill({ color: shade(color, 0.25), alpha: 0.4 });
+    g.rect(-r * 0.04, -r * 0.5, r * 0.08, r * 1.2).fill({ color: shade(color, -0.3), alpha: 0.5 });
+    g.rect(-r * 0.35, -r * 0.04, r * 0.7, r * 0.08).fill({ color: shade(color, -0.3), alpha: 0.5 });
+  } else {
+    g.circle(0, 0, r * 0.52).fill(color);
+    g.circle(0, 0, r * 0.52).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
+    g.circle(0, 0, r * 0.38).stroke({ width: 1.2, color: shade(color, -0.3), alpha: 0.4 });
+    g.circle(0, 0, r * 0.15).fill(shade(color, -0.2));
+    g.circle(0, 0, r * 0.15).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+    g.ellipse(-r * 0.18, -r * 0.2, r * 0.16, r * 0.1).fill({ color: shade(color, 0.3), alpha: 0.4 });
+  }
+  return g;
+}
+
 function buildRig(unit: Unit): Rig {
   const r = unitDef(unit.type).radius;
   const faction = FACTION_COLORS[unit.owner];
@@ -516,7 +563,7 @@ function buildRig(unit: Unit): Rig {
   if (type === "horse_rider") return buildHorseRig(r, faction, root, body);
 
   const back = shade(faction, -0.4);
-  const boot = 0x5a3d22;
+  const boot = STYLE.boot;
 
   const legLength = r * 1.25;
   const legWidth = r * 0.44;
@@ -525,7 +572,8 @@ function buildRig(unit: Unit): Rig {
 
   const torso = new Container();
   torso.position.set(0, r * 0.02);
-  torso.addChild(torsoGraphic(r, faction, type === "hero" ? shade(faction, -0.45) : undefined));
+  const torsoGear = (type === "swordsman" || type === "spearman") ? "pauldron" as const : type === "villager" ? "belt" as const : undefined;
+  torso.addChild(torsoGraphic(r, faction, type === "hero" ? shade(faction, -0.45) : undefined, torsoGear));
 
   const head = pivot(headGraphic(r, faction, headGear(type)), 0, -r * 1.3);
 
@@ -536,6 +584,16 @@ function buildRig(unit: Unit): Rig {
   const weapon = buildWeapon(type);
   weapon.position.set(0, armLength * 0.72);
   armFront.addChild(weapon);
+
+  if (type === "swordsman") {
+    const shield = shieldGraphic(r, "kite", faction);
+    shield.position.set(0, armLength * 0.35);
+    armBack.addChild(shield);
+  } else if (type === "spearman") {
+    const shield = shieldGraphic(r, "round", faction);
+    shield.position.set(0, armLength * 0.35);
+    armBack.addChild(shield);
+  }
 
   body.addChild(legBack, armBack, torso, legFront, head, armFront);
 
@@ -578,30 +636,42 @@ function attackKindFor(type: Unit["type"]): AttackKind {
 function buildHorseRig(r: number, faction: number, root: Container, body: Container): Rig {
   const horse = new Container();
   const horseBody = new Container();
+  const hr = r * 1.15;
 
   const g = new Graphics();
-  g.roundRect(-r * 1.15, -r * 0.5, r * 2.3, r * 1.0, r * 0.42).fill(HORSE);
-  g.roundRect(-r * 1.15, -r * 0.5, r * 2.3, r * 1.0, r * 0.42).stroke({
+  g.roundRect(-hr, -r * 0.55, hr * 2, r * 1.1, r * 0.45).fill(HORSE);
+  g.roundRect(-hr, -r * 0.55, hr * 2, r * 1.1, r * 0.45).stroke({
     width: 2.2,
     color: OUTLINE,
     alpha: 0.9,
   });
-  g.ellipse(-r * 0.35, -r * 0.2, r * 0.7, r * 0.28).fill({ color: shade(HORSE, 0.2), alpha: 0.5 });
-  g.roundRect(r * 0.75, -r * 1.35, r * 0.5, r * 1.2, r * 0.2).fill(HORSE);
-  g.roundRect(r * 0.75, -r * 1.35, r * 0.5, r * 1.2, r * 0.2).stroke({
+  g.ellipse(-r * 0.3, -r * 0.25, r * 0.75, r * 0.32).fill({ color: shade(HORSE, 0.2), alpha: 0.45 });
+  g.ellipse(r * 0.3, r * 0.1, r * 0.6, r * 0.25).fill({ color: HORSE_DARK, alpha: 0.3 });
+  g.roundRect(-hr * 0.3, -r * 0.42, hr * 0.65, r * 0.32, r * 0.1).fill(faction);
+  g.roundRect(-hr * 0.3, -r * 0.42, hr * 0.65, r * 0.32, r * 0.1).stroke({ width: 1.2, color: OUTLINE, alpha: 0.7 });
+  g.roundRect(r * 0.75, -r * 1.45, r * 0.55, r * 1.3, r * 0.22).fill(HORSE);
+  g.roundRect(r * 0.75, -r * 1.45, r * 0.55, r * 1.3, r * 0.22).stroke({
     width: 2,
     color: OUTLINE,
     alpha: 0.9,
   });
-  g.ellipse(r * 1.35, -r * 1.4, r * 0.42, r * 0.3).fill(HORSE);
-  g.ellipse(r * 1.35, -r * 1.4, r * 0.42, r * 0.3).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
-  g.circle(r * 1.55, -r * 1.45, r * 0.08).fill(OUTLINE);
-  g.poly([r * 0.85, -r * 1.5, r * 1.0, -r * 1.9, r * 1.12, -r * 1.48]).fill(HORSE_DARK);
-  g.poly([-r * 1.15, -r * 0.3, -r * 0.85, -r * 0.35, -r * 1.6, r * 0.4]).fill(HORSE_DARK);
+  for (let i = 0; i < 5; i += 1) {
+    const mx = r * 0.78 + i * r * 0.08;
+    const my = -r * 1.5 - i * r * 0.04;
+    g.moveTo(mx, my).lineTo(mx - r * 0.15, my + r * 0.35).stroke({ width: 1.8, color: HORSE_DARK, alpha: 0.7 });
+  }
+  g.ellipse(r * 1.45, -r * 1.5, r * 0.45, r * 0.32).fill(HORSE);
+  g.ellipse(r * 1.45, -r * 1.5, r * 0.45, r * 0.32).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
+  g.ellipse(r * 1.6, -r * 1.48, r * 0.14, r * 0.1).fill({ color: shade(HORSE, 0.2), alpha: 0.5 });
+  g.circle(r * 1.65, -r * 1.55, r * 0.09).fill(OUTLINE);
+  g.circle(r * 1.62, -r * 1.58, r * 0.03).fill({ color: 0xffffff, alpha: 0.6 });
+  g.poly([r * 0.9, -r * 1.6, r * 1.05, -r * 2.0, r * 1.18, -r * 1.58]).fill(HORSE_DARK);
+  g.poly([-hr, -r * 0.35, -hr + r * 0.3, -r * 0.4, -hr - r * 0.5, r * 0.45]).fill(HORSE_DARK);
+  g.poly([-hr - r * 0.3, r * 0.2, -hr - r * 0.55, r * 0.5, -hr - r * 0.15, r * 0.5]).fill({ color: HORSE_DARK, alpha: 0.7 });
   horseBody.addChild(g);
 
-  const legWidth = r * 0.3;
-  const legLen = r * 1.05;
+  const legWidth = r * 0.32;
+  const legLen = r * 1.1;
   const hl = (color: number): Graphics => {
     const lg = new Graphics();
     lg.roundRect(-legWidth / 2, 0, legWidth, legLen, legWidth * 0.4).fill(color);
@@ -613,28 +683,29 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
     lg.rect(-legWidth * 0.7, legLen - legWidth * 0.5, legWidth * 1.4, legWidth * 0.6).fill(0x2b2320);
     return lg;
   };
-  const horseLegBack = pivot(hl(HORSE_DARK), -r * 0.62, r * 0.3);
-  const horseLegFront = pivot(hl(HORSE), r * 0.55, r * 0.3);
+  const horseLegBack = pivot(hl(HORSE_DARK), -r * 0.65, r * 0.35);
+  const horseLegFront = pivot(hl(HORSE), r * 0.6, r * 0.35);
   horse.addChild(horseLegBack, horseBody, horseLegFront);
 
-  // rider (positioned once; only the torso bob holder moves)
   const rider = new Container();
-  rider.position.set(-r * 0.06, -r * 1.02);
+  rider.position.set(-r * 0.06, -r * 1.1);
 
   const backArm = pivot(arm(shade(faction, -0.35), SKIN, r * 1.15, r * 0.34), -r * 0.4, -r * 0.28);
   const torsoHolder = new Container();
-  torsoHolder.addChild(torsoGraphic(r * 1.2, faction, undefined));
+  torsoHolder.addChild(torsoGraphic(r * 1.2, faction, shade(faction, -0.35)));
   const riderHead = pivot(headGraphic(r * 1.2, faction, "helm"), 0, -r * 1.0);
   const frontArm = pivot(arm(faction, SKIN, r * 1.15, r * 0.36), r * 0.44, -r * 0.26);
 
   const lance = new Graphics();
-  lance.roundRect(0, -r * 0.08, r * 2.6, r * 0.16, r * 0.06).fill(WOOD);
-  lance.roundRect(0, -r * 0.08, r * 2.6, r * 0.16, r * 0.06).stroke({
+  lance.roundRect(0, -r * 0.08, r * 2.8, r * 0.16, r * 0.06).fill(WOOD);
+  lance.roundRect(0, -r * 0.08, r * 2.8, r * 0.16, r * 0.06).stroke({
     width: 1.3,
     color: OUTLINE,
     alpha: 0.85,
   });
-  lance.poly([r * 2.54, -r * 0.22, r * 2.54, r * 0.26, r * 2.95, r * 0.02]).fill(STEEL);
+  lance.roundRect(r * 0.4, -r * 0.12, r * 0.3, r * 0.24, r * 0.04).fill(faction);
+  lance.poly([r * 2.72, -r * 0.24, r * 2.72, r * 0.28, r * 3.15, r * 0.02]).fill(STEEL);
+  lance.poly([r * 2.72, -r * 0.24, r * 2.72, r * 0.28, r * 3.15, r * 0.02]).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
   lance.position.set(0, r * 0.82);
   frontArm.addChild(lance);
 
@@ -674,47 +745,65 @@ function buildWeapon(type: Unit["type"]): Container {
 
   switch (type) {
     case "villager": {
-      // short handle in the hand with a small sickle blade at the top
       g.roundRect(-1.3, -r * 0.55, 2.6, r * 0.6, 1.3).fill(WOOD);
       g.roundRect(-1.3, -r * 0.55, 2.6, r * 0.6, 1.3).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
       g.moveTo(1.3, -r * 0.5)
         .quadraticCurveTo(r * 1.0, -r * 1.05, 0.0, -r * 1.2)
         .stroke({ width: 2.4, color: STEEL });
+      g.moveTo(0.8, -r * 0.5)
+        .quadraticCurveTo(r * 0.8, -r * 0.85, 0.0, -r * 1.0)
+        .stroke({ width: 1.2, color: shade(STEEL, 0.3), alpha: 0.5 });
       break;
     }
     case "swordsman": {
       g.roundRect(-1.5, -r * 0.15, 3, r * 0.55, 1.2).fill(LEATHER);
-      g.rect(-4.2, -r * 0.35, 8.4, 2.4).fill(GOLD);
-      g.roundRect(-1.6, -r * 1.85, 3.2, r * 1.5, 1.4).fill(STEEL);
-      g.roundRect(-1.6, -r * 1.85, 3.2, r * 1.5, 1.4).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
-      g.poly([-1.6, -r * 1.85, 1.6, -r * 1.85, 0, -r * 2.2]).fill(STEEL);
+      g.roundRect(-1.5, -r * 0.15, 3, r * 0.55, 1.2).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+      g.rect(-4.8, -r * 0.38, 9.6, 2.8).fill(GOLD);
+      g.rect(-4.8, -r * 0.38, 9.6, 1.2).fill({ color: shade(GOLD, 0.3), alpha: 0.5 });
+      g.rect(-4.8, -r * 0.38, 9.6, 2.8).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+      g.roundRect(-1.8, -r * 1.95, 3.6, r * 1.6, 1.4).fill(STEEL);
+      g.roundRect(-1.8, -r * 1.95, 3.6, r * 1.6, 1.4).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+      g.rect(-0.5, -r * 1.9, 1.0, r * 1.5).fill({ color: shade(STEEL, 0.3), alpha: 0.35 });
+      g.poly([-1.8, -r * 1.95, 1.8, -r * 1.95, 0, -r * 2.35]).fill(STEEL);
+      g.poly([-1.8, -r * 1.95, 1.8, -r * 1.95, 0, -r * 2.35]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
       break;
     }
     case "spearman": {
-      g.roundRect(-1.2, -r * 2.7, 2.4, r * 3.1, 1.2).fill(WOOD);
-      g.roundRect(-1.2, -r * 2.7, 2.4, r * 3.1, 1.2).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
-      g.poly([-2.4, -r * 2.7, 2.4, -r * 2.7, 0, -r * 3.4]).fill(STEEL);
+      g.roundRect(-1.3, -r * 2.8, 2.6, r * 3.2, 1.2).fill(WOOD);
+      g.roundRect(-1.3, -r * 2.8, 2.6, r * 3.2, 1.2).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.rect(-0.4, -r * 2.0, 0.8, r * 2.0).fill({ color: shade(WOOD, 0.15), alpha: 0.3 });
+      g.poly([-3, -r * 2.8, 3, -r * 2.8, 0, -r * 3.55]).fill(STEEL);
+      g.poly([-3, -r * 2.8, 3, -r * 2.8, 0, -r * 3.55]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.rect(-0.3, -r * 3.5, 0.6, r * 0.8).fill({ color: shade(STEEL, 0.3), alpha: 0.4 });
       break;
     }
     case "crossbowman": {
-      g.roundRect(-r * 0.4, -1.6, r * 1.8, 3.2, 1.4).fill(WOOD);
-      g.roundRect(-r * 0.4, -1.6, r * 1.8, 3.2, 1.4).stroke({ width: 1.2, color: OUTLINE, alpha: 0.85 });
-      g.moveTo(r * 1.35, -3.6)
-        .quadraticCurveTo(r * 1.75, 0, r * 1.35, 3.6)
-        .stroke({ width: 2, color: STEEL_DARK });
-      g.moveTo(r * 1.35, -3.6).lineTo(r * 0.95, 0).lineTo(r * 1.35, 3.6).stroke({
+      g.roundRect(-r * 0.4, -1.8, r * 1.9, 3.6, 1.4).fill(WOOD);
+      g.roundRect(-r * 0.4, -1.8, r * 1.9, 3.6, 1.4).stroke({ width: 1.2, color: OUTLINE, alpha: 0.85 });
+      g.rect(-r * 0.2, -0.6, r * 1.2, 1.2).fill({ color: shade(WOOD, 0.15), alpha: 0.3 });
+      g.moveTo(r * 1.45, -4.0)
+        .quadraticCurveTo(r * 1.9, 0, r * 1.45, 4.0)
+        .stroke({ width: 2.2, color: STEEL_DARK });
+      g.moveTo(r * 1.45, -4.0).lineTo(r * 1.0, 0).lineTo(r * 1.45, 4.0).stroke({
         width: 1.1,
         color: 0xf5f5f5,
         alpha: 0.6,
       });
+      g.rect(r * 0.5, -r * 0.35, r * 0.3, r * 0.7).fill(STEEL_DARK);
       break;
     }
     case "hero": {
       g.roundRect(-1.6, -r * 0.15, 3.2, r * 0.55, 1.2).fill(LEATHER);
-      g.rect(-4.6, -r * 0.38, 9.2, 2.8).fill(GOLD);
-      g.roundRect(-1.7, -r * 2.0, 3.4, r * 1.65, 1.4).fill(0xf6f1d6);
-      g.roundRect(-1.7, -r * 2.0, 3.4, r * 1.65, 1.4).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
-      g.poly([-1.7, -r * 2.0, 1.7, -r * 2.0, 0, -r * 2.38]).fill(0xf6f1d6);
+      g.rect(-5.2, -r * 0.42, 10.4, 3.2).fill(GOLD);
+      g.rect(-5.2, -r * 0.42, 10.4, 1.4).fill({ color: shade(GOLD, 0.3), alpha: 0.5 });
+      g.rect(-5.2, -r * 0.42, 10.4, 3.2).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
+      g.circle(-4.5, -r * 0.26, 1.4).fill(0x9b1c2e);
+      g.circle(4.5, -r * 0.26, 1.4).fill(0x9b1c2e);
+      g.roundRect(-2.0, -r * 2.15, 4.0, r * 1.75, 1.4).fill(0xf6f1d6);
+      g.roundRect(-2.0, -r * 2.15, 4.0, r * 1.75, 1.4).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+      g.rect(-0.5, -r * 2.1, 1.0, r * 1.65).fill({ color: 0xffffff, alpha: 0.2 });
+      g.poly([-2.0, -r * 2.15, 2.0, -r * 2.15, 0, -r * 2.55]).fill(0xf6f1d6);
+      g.poly([-2.0, -r * 2.15, 2.0, -r * 2.15, 0, -r * 2.55]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
       break;
     }
     default:

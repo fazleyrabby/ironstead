@@ -43,6 +43,23 @@ export const STYLE = {
   flowerYellow: 0xf6d76a,
   flowerPink: 0xf2a0c0,
   mushroom: 0xe0553f,
+
+  skin: 0xf0c49a,
+  skinDark: 0xd39b6e,
+  steel: 0xc3ccd8,
+  steelDark: 0x7c8794,
+  leather: 0x6b4a2a,
+  gold: 0xf2c14e,
+  goldDark: 0x7a5a12,
+  horse: 0x7a5230,
+  horseDark: 0x54371d,
+  boot: 0x5a3d22,
+  roofBlue: 0x3b6db3,
+  canvasTent: 0xe4d6b8,
+  windowLit: 0xffd97a,
+  fire: 0xf08a2d,
+  fireCore: 0xf6d76a,
+  dust: 0xe6dcc0,
 } as const;
 
 export function inkCircle(
