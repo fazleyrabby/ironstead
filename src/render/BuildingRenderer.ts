@@ -4,7 +4,7 @@ import { def } from "../sim/selectors";
 import { isTileExplored, isTileVisible } from "../sim/visibility";
 import type { VisibilityMap } from "../sim/visibility";
 import type { Building, GameState, PlayerId } from "../sim/types";
-import { buildingTexture, USE_SPRITE_ASSETS } from "./Assets";
+import { buildingTexture, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./Assets";
 import { softShadowTexture } from "./softShadow";
 import { STYLE } from "./style";
 
@@ -102,7 +102,9 @@ export class BuildingRenderer {
     const container = new Container();
     const overlay = new Graphics();
     const progress = new Graphics();
-    const texture = USE_SPRITE_ASSETS ? buildingTexture(building.type, building.owner) : undefined;
+    const texture = USE_SPRITE_ASSETS || USE_V2_ASSET_PROTOTYPES
+      ? buildingTexture(building.type, building.owner)
+      : undefined;
     let sprite: Sprite | undefined;
     let body: Graphics;
     if (texture) {
@@ -421,42 +423,65 @@ function drawTownCenter(g: Graphics, building: Building, faction: number): void 
   const h = building.height;
   const colors = def(building.type).colors;
   const lw = line(w);
+  const roof = shade(faction, -0.08);
+  const plaster = shade(colors.body, 0.12);
   shadow(g, w, h);
   foundation(g, w, h, lw);
   g.roundRect(-w * 0.4, -h * 0.34, w * 0.8, h * 0.6, 8).fill({ color: 0xffffff, alpha: 0.07 });
 
-  const hallW = w * 0.72;
-  const hallH = h * 0.4;
-  const hallY = h * 0.08;
-  timberWall(g, -hallW / 2, hallY, hallW, hallH, colors.body, lw);
-  gableRoof(g, -hallW / 2 - 4, hallY - h * 0.26, hallY + 2, hallW + 8, colors.roof, lw);
+  const wingW = w * 0.3;
+  const wingH = h * 0.28;
+  const wingY = h * 0.12;
+  timberWall(g, -w * 0.46, wingY, wingW, wingH, plaster, lw);
+  timberWall(g, w * 0.16, wingY, wingW, wingH, plaster, lw);
+  gableRoof(g, -w * 0.49, wingY - h * 0.18, wingY + 2, wingW + 6, roof, lw);
+  gableRoof(g, w * 0.13, wingY - h * 0.18, wingY + 2, wingW + 6, roof, lw);
+
+  const hallW = w * 0.62;
+  const hallH = h * 0.39;
+  const hallY = h * 0.06;
+  timberWall(g, -hallW / 2, hallY, hallW, hallH, plaster, lw);
+  gableRoof(g, -hallW / 2 - 4, hallY - h * 0.25, hallY + 2, hallW + 8, roof, lw);
+
+  // A small chimney and drifting smoke keep the silhouette lively without
+  // compromising the clean footprint used for selection and pathing.
+  g.rect(w * 0.25, -h * 0.2, w * 0.08, h * 0.2).fill(STONE_DARK);
+  g.rect(w * 0.23, -h * 0.23, w * 0.12, h * 0.05).fill(STONE);
+  g.rect(w * 0.23, -h * 0.23, w * 0.12, h * 0.05).stroke({ width: 1.2, color: OUTLINE, alpha: 0.85 });
+  smokeWisp(g, w * 0.29, -h * 0.34, w * 0.1);
 
   const towerW = w * 0.32;
-  const towerH = h * 0.5;
-  const towerY = -h * 0.5;
+  const towerH = h * 0.58;
+  const towerY = -h * 0.54;
   g.roundRect(-towerW / 2, towerY, towerW, towerH, 5).fill(STONE);
   brickwork(g, -towerW / 2, towerY, towerW, towerH, STONE_DARK, 4);
   g.roundRect(-towerW / 2, towerY, towerW, towerH, 5).stroke({ width: lw, color: OUTLINE, alpha: 0.9 });
   g.roundRect(-towerW / 2 + 3, towerY + 3, towerW - 6, towerH * 0.12).fill({ color: 0xffffff, alpha: 0.12 });
-  const merlons = 3;
-  const mw = towerW / (merlons * 2 - 1);
-  for (let i = 0; i < merlons; i += 1) {
-    const mx = -towerW / 2 + i * mw * 2;
-    g.rect(mx, towerY - mw * 0.8, mw, mw * 0.8).fill(STONE);
-    g.rect(mx, towerY - mw * 0.8, mw, mw * 0.8).stroke({ width: 1.5, color: OUTLINE, alpha: 0.9 });
-  }
+  gableRoof(g, -towerW / 2 - 4, towerY - h * 0.22, towerY + 2, towerW + 8, roof, lw);
   g.rect(-towerW / 2, towerY + towerH - 3, towerW, 3).fill({ color: 0x000000, alpha: 0.12 });
 
+  const clockY = towerY + towerH * 0.42;
+  g.circle(0, clockY, w * 0.075).fill(STYLE.gold);
+  g.circle(0, clockY, w * 0.058).fill(0xf3e5bd);
+  g.circle(0, clockY, w * 0.075).stroke({ width: 1.6, color: OUTLINE, alpha: 0.9 });
+  g.moveTo(0, clockY).lineTo(0, clockY - w * 0.035).stroke({ width: 1.5, color: WOOD_DARK });
+  g.moveTo(0, clockY).lineTo(w * 0.03, clockY + w * 0.012).stroke({ width: 1.5, color: WOOD_DARK });
+  g.circle(0, clockY, w * 0.009).fill(STYLE.goldDark);
+
+  g.rect(-towerW * 0.58, towerY + towerH * 0.13, towerW * 1.16, h * 0.045).fill(STYLE.goldDark);
+  g.rect(-towerW * 0.52, towerY + towerH * 0.14, towerW * 1.04, h * 0.018).fill(STYLE.gold);
+
   door(g, 0, hallY + hallH, w * 0.14, h * 0.2);
-  windowLit(g, -hallW * 0.3, hallY + hallH * 0.45, w * 0.07);
-  windowLit(g, hallW * 0.3, hallY + hallH * 0.45, w * 0.07);
-  windowLit(g, 0, towerY + towerH * 0.42, w * 0.06);
+  windowLit(g, -hallW * 0.34, hallY + hallH * 0.48, w * 0.065);
+  windowLit(g, hallW * 0.34, hallY + hallH * 0.48, w * 0.065);
+  windowLit(g, -w * 0.39, wingY + wingH * 0.5, w * 0.055);
+  windowLit(g, w * 0.39, wingY + wingH * 0.5, w * 0.055);
   torch(g, -hallW * 0.48, hallY + hallH - 2, w * 0.08);
   torch(g, hallW * 0.48, hallY + hallH - 2, w * 0.08);
 
-  pennant(g, 0, towerY - mw * 0.8 + 2, w * 0.15, faction);
-  pennant(g, -hallW / 2 + 2, hallY - h * 0.12, w * 0.12, faction);
-  pennant(g, hallW / 2 - 2, hallY - h * 0.12, w * 0.12, faction);
+  pennant(g, 0, towerY - h * 0.2, w * 0.15, faction);
+  pennant(g, -w * 0.43, wingY - h * 0.09, w * 0.11, faction);
+  pennant(g, w * 0.43, wingY - h * 0.09, w * 0.11, faction);
 }
 
 function drawHouse(g: Graphics, building: Building, faction: number): void {
@@ -477,7 +502,7 @@ function drawHouse(g: Graphics, building: Building, faction: number): void {
   });
 
   timberWall(g, -w * 0.36, wallY, w * 0.72, wallH, 0xefe0c0, lw);
-  gableRoof(g, -w * 0.42, wallY - h * 0.32, wallY + 2, w * 0.84, STYLE.roofBlue, lw);
+  gableRoof(g, -w * 0.42, wallY - h * 0.32, wallY + 2, w * 0.84, shade(faction, -0.08), lw);
 
   g.rect(w * 0.15, wallY - h * 0.34, w * 0.1, h * 0.28).fill(STYLE.stone);
   g.rect(w * 0.15, wallY - h * 0.34, w * 0.1, h * 0.28).stroke({
@@ -559,7 +584,7 @@ function drawStorage(g: Graphics, building: Building, faction: number): void {
   const wallH = h * 0.4;
   const wallY = -h * 0.08;
   timberWall(g, -w * 0.34, wallY, w * 0.68, wallH, STYLE.woodLight, lw);
-  gableRoof(g, -w * 0.4, wallY - h * 0.26, wallY + 2, w * 0.8, ROOF_BLUE, lw);
+  gableRoof(g, -w * 0.4, wallY - h * 0.26, wallY + 2, w * 0.8, shade(faction, -0.08), lw);
 
   g.roundRect(-w * 0.13, wallY + wallH - h * 0.24, w * 0.26, h * 0.24, 3).fill(STYLE.woodDark);
   g.rect(-w * 0.13, wallY + wallH - h * 0.13, w * 0.26, 2).fill({ color: faction, alpha: 0.9 });
@@ -726,7 +751,7 @@ function drawAcademy(g: Graphics, building: Building, faction: number): void {
     g.roundRect(cx - w * 0.05, hallY + hallH, w * 0.1, h * 0.04, 2).fill(STYLE.stone);
   }
 
-  g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).fill(ROOF_BLUE);
+  g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).fill(shade(faction, -0.08));
   g.poly([-hallW / 2 - 4, hallY, 0, hallY - h * 0.26, hallW / 2 + 4, hallY]).stroke({
     width: lw,
     color: OUTLINE,

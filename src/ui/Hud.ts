@@ -30,7 +30,7 @@ export class Hud {
 
   constructor(parent: HTMLElement, options: HudOptions = {}) {
     this.options = options;
-    const title = el("div", "hud-title", "BROWSER RTS");
+    const title = el("div", "hud-title", "IRONSTEAD");
     this.testBadge = el("div", "hud-pill hud-test hidden", "TEST MODE");
     const resources = el("div", "hud-res");
 

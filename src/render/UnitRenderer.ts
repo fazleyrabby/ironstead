@@ -4,7 +4,7 @@ import { unitDef } from "../sim/selectors";
 import { isTileExplored, isTileVisible } from "../sim/visibility";
 import type { VisibilityMap } from "../sim/visibility";
 import type { GameState, PlayerId, Unit } from "../sim/types";
-import { UNIT_FRAMES, unitTexture, USE_SPRITE_ASSETS } from "./Assets";
+import { UNIT_FRAMES, unitTexture, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./Assets";
 import { softShadowTexture } from "./softShadow";
 import { STYLE } from "./style";
 
@@ -50,6 +50,7 @@ interface Rig {
   stride: number;
   twoHanded: boolean;
   attackKind: AttackKind;
+  visualScale: number;
 }
 
 interface Anim {
@@ -151,7 +152,9 @@ export class UnitRenderer {
     const container = new Container();
     const overlay = new Graphics();
     const fx = new Graphics();
-    const texture = USE_SPRITE_ASSETS ? unitTexture(unit.type, unit.owner, 0) : undefined;
+    const texture = USE_SPRITE_ASSETS || USE_V2_ASSET_PROTOTYPES
+      ? unitTexture(unit.type, unit.owner, 0)
+      : undefined;
 
     let sprite: Sprite | undefined;
     let rig: Rig | undefined;
@@ -302,7 +305,7 @@ export class UnitRenderer {
     const followThrough = Math.max(0, -Math.sin(attackPhase + 0.6)) * 0.3;
     const lunge = (attackK + followThrough) * (rig.attackKind === "thrust" || rig.attackKind === "cavalry" ? 4 : 2.5);
 
-    rig.root.scale.set(anim.facing, 1);
+    rig.root.scale.set(anim.facing * rig.visualScale, rig.visualScale);
     rig.body.x = lunge;
     rig.body.y = -bob * 0.95;
     rig.body.rotation = 0.05 * anim.move + attackK * 0.07 - windUp * 0.12;
@@ -414,7 +417,13 @@ function arm(color: number, skin: number, length: number, width: number): Graphi
   return g;
 }
 
-function torsoGraphic(r: number, tunic: number, cape: number | undefined, gear?: "pauldron" | "belt"): Graphics {
+function torsoGraphic(
+  r: number,
+  tunic: number,
+  cape: number | undefined,
+  gear?: "pauldron" | "belt",
+  role?: Unit["type"],
+): Graphics {
   const g = new Graphics();
   const w = r * 1.08;
   const h = r * 0.98;
@@ -431,6 +440,13 @@ function torsoGraphic(r: number, tunic: number, cape: number | undefined, gear?:
   g.roundRect(-w / 2, -h / 2, w, h, r * 0.42).stroke({ width: 2.1, color: OUTLINE, alpha: 0.9 });
   g.roundRect(-w / 2, h * 0.16, w, h * 0.16, r * 0.1).fill(shade(tunic, -0.35));
   g.ellipse(-w * 0.22, -h * 0.2, w * 0.26, h * 0.22).fill({ color: shade(tunic, 0.3), alpha: 0.45 });
+  // A high-contrast surcoat keeps faction ownership legible at gameplay zoom.
+  if (role !== "villager") {
+    g.poly([-w * 0.2, -h * 0.42, w * 0.2, -h * 0.42, w * 0.15, h * 0.35, 0, h * 0.5, -w * 0.15, h * 0.35])
+      .fill(shade(tunic, 0.32));
+    g.circle(0, -h * 0.02, r * 0.11).fill(STYLE.gold);
+    g.circle(0, -h * 0.02, r * 0.11).stroke({ width: 1, color: OUTLINE, alpha: 0.75 });
+  }
   if (gear === "pauldron") {
     g.ellipse(-w * 0.52, -h * 0.36, w * 0.22, h * 0.18).fill(STEEL);
     g.ellipse(-w * 0.52, -h * 0.36, w * 0.22, h * 0.18).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
@@ -446,7 +462,7 @@ function torsoGraphic(r: number, tunic: number, cape: number | undefined, gear?:
   return g;
 }
 
-function headGraphic(r: number, faction: number, gear: HeadGear): Graphics {
+function headGraphic(r: number, faction: number, gear: HeadGear, role?: Unit["type"]): Graphics {
   const g = new Graphics();
   const hr = r * 0.62;
   g.roundRect(-hr * 0.34, hr * 0.35, hr * 0.68, hr * 1.15, hr * 0.22).fill(SKIN_DARK);
@@ -481,6 +497,14 @@ function headGraphic(r: number, faction: number, gear: HeadGear): Graphics {
     g.ellipse(-hr * 0.4, -hr * 0.6, hr * 0.3, hr * 0.18).fill({ color: shade(STEEL, 0.25), alpha: 0.45 });
     g.poly([-hr * 0.14, -hr * 1.1, hr * 0.14, -hr * 1.1, 0, -hr * 1.6]).fill(STEEL_DARK);
     g.poly([-hr * 0.14, -hr * 1.1, hr * 0.14, -hr * 1.1, 0, -hr * 1.6]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.75 });
+    if (role === "spearman") {
+      g.rect(-hr * 0.92, -hr * 0.1, hr * 0.25, hr * 0.72).fill(STEEL_DARK);
+      g.rect(hr * 0.67, -hr * 0.1, hr * 0.25, hr * 0.72).fill(STEEL_DARK);
+      g.poly([-hr * 0.12, -hr * 1.48, hr * 0.12, -hr * 1.48, hr * 0.5, -hr * 2.0, -hr * 0.5, -hr * 2.0]).fill(faction);
+      g.poly([-hr * 0.12, -hr * 1.48, hr * 0.12, -hr * 1.48, hr * 0.5, -hr * 2.0, -hr * 0.5, -hr * 2.0]).stroke({ width: 1, color: OUTLINE, alpha: 0.75 });
+    } else if (role === "swordsman") {
+      g.rect(-hr * 1.12, -hr * 0.12, hr * 2.24, hr * 0.18).fill(STEEL_DARK);
+    }
   } else if (gear === "cap") {
     dome(LEATHER);
     g.rect(-hr * 1.16, -hr * 0.2, hr * 2.32, hr * 0.2).fill(shade(LEATHER, -0.25));
@@ -573,9 +597,9 @@ function buildRig(unit: Unit): Rig {
   const torso = new Container();
   torso.position.set(0, r * 0.02);
   const torsoGear = (type === "swordsman" || type === "spearman") ? "pauldron" as const : type === "villager" ? "belt" as const : undefined;
-  torso.addChild(torsoGraphic(r, faction, type === "hero" ? shade(faction, -0.45) : undefined, torsoGear));
+  torso.addChild(torsoGraphic(r, faction, type === "hero" ? shade(faction, -0.45) : undefined, torsoGear, type));
 
-  const head = pivot(headGraphic(r, faction, headGear(type)), 0, -r * 1.3);
+  const head = pivot(headGraphic(r, faction, headGear(type), type), 0, -r * 1.3);
 
   const armLength = r * 1.08;
   const armWidth = r * 0.34;
@@ -593,6 +617,17 @@ function buildRig(unit: Unit): Rig {
     const shield = shieldGraphic(r, "round", faction);
     shield.position.set(0, armLength * 0.35);
     armBack.addChild(shield);
+  } else if (type === "crossbowman") {
+    const quiver = new Graphics();
+    quiver.roundRect(-r * 0.18, -r * 0.45, r * 0.36, r * 1.05, r * 0.12).fill(LEATHER);
+    quiver.roundRect(-r * 0.18, -r * 0.45, r * 0.36, r * 1.05, r * 0.12).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
+    for (const x of [-0.11, 0, 0.11]) {
+      quiver.moveTo(r * x, -r * 0.52).lineTo(r * x, -r * 1.0).stroke({ width: 1.2, color: STYLE.woodLight });
+      quiver.poly([r * x - 1.8, -r * 0.95, r * x + 1.8, -r * 0.95, r * x, -r * 1.12]).fill(STYLE.steel);
+    }
+    quiver.rotation = -0.28;
+    quiver.position.set(-r * 0.25, armLength * 0.15);
+    armBack.addChild(quiver);
   }
 
   body.addChild(legBack, armBack, torso, legFront, head, armFront);
@@ -612,6 +647,7 @@ function buildRig(unit: Unit): Rig {
     stride: type === "villager" ? 8 : 7.2,
     twoHanded: type === "crossbowman",
     attackKind: attackKindFor(type),
+    visualScale: type === "hero" ? 1.22 : type === "villager" ? 1.1 : 1.16,
   };
 }
 
@@ -692,8 +728,8 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
 
   const backArm = pivot(arm(shade(faction, -0.35), SKIN, r * 1.15, r * 0.34), -r * 0.4, -r * 0.28);
   const torsoHolder = new Container();
-  torsoHolder.addChild(torsoGraphic(r * 1.2, faction, shade(faction, -0.35)));
-  const riderHead = pivot(headGraphic(r * 1.2, faction, "helm"), 0, -r * 1.0);
+  torsoHolder.addChild(torsoGraphic(r * 1.2, faction, shade(faction, -0.35), undefined, "horse_rider"));
+  const riderHead = pivot(headGraphic(r * 1.2, faction, "helm", "horse_rider"), 0, -r * 1.0);
   const frontArm = pivot(arm(faction, SKIN, r * 1.15, r * 0.36), r * 0.44, -r * 0.26);
 
   const lance = new Graphics();
@@ -728,6 +764,7 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
     stride: 10,
     twoHanded: false,
     attackKind: "cavalry",
+    visualScale: 1.08,
   };
 }
 

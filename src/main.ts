@@ -4,7 +4,7 @@ import { GRID_COLS, GRID_ROWS, TILE_SIZE, worldToTile } from "./config/world";
 import { EventBus } from "./core/EventBus";
 import { GameLoop } from "./core/GameLoop";
 import { InputManager } from "./input/InputManager";
-import { loadGameAssets, USE_SPRITE_ASSETS } from "./render/Assets";
+import { loadGameAssets, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./render/Assets";
 import { BuildingRenderer } from "./render/BuildingRenderer";
 import { Camera } from "./render/Camera";
 import { FogRenderer } from "./render/FogRenderer";
@@ -26,6 +26,7 @@ import { Hud } from "./ui/Hud";
 import { MainMenu } from "./ui/MainMenu";
 import { Minimap } from "./ui/Minimap";
 import { OutcomeOverlay } from "./ui/OutcomeOverlay";
+import { PauseOverlay } from "./ui/PauseOverlay";
 import { SoundFX } from "./audio/sfx";
 
 function placementOrigin(type: BuildingType, tile: { x: number; y: number }) {
@@ -72,7 +73,7 @@ async function main(): Promise<void> {
   const camera = new Camera(world);
   camera.resize(app.screen.width, app.screen.height);
 
-  if (USE_SPRITE_ASSETS) await loadGameAssets();
+  if (USE_SPRITE_ASSETS || USE_V2_ASSET_PROTOTYPES) await loadGameAssets();
 
   const baseTile = MAP_LAYOUT.player.baseTile;
   const baseCenter = { x: baseTile.x * TILE_SIZE, y: baseTile.y * TILE_SIZE };
@@ -94,6 +95,12 @@ async function main(): Promise<void> {
   });
   const commandPanel = new CommandPanel(hudBottom, (command) => game.execute(command));
   const outcome = new OutcomeOverlay(document.body, () => window.location.reload());
+  let pauseOverlay: PauseOverlay;
+  const setPaused = (paused: boolean): void => {
+    loop.timeScale = paused ? 0 : 1;
+    pauseOverlay?.setPaused(paused);
+  };
+  pauseOverlay = new PauseOverlay(document.body, () => setPaused(false));
   const minimap = new Minimap(document.body, {
     onNavigate: (x, y) => camera.centerOn(x, y, camera.zoomLevel()),
     onOrder: (x, y) => orderAtWorld({ x, y }),
@@ -341,15 +348,11 @@ async function main(): Promise<void> {
         attackMovePending = false;
         if (game.state.ui.pendingBuild) {
           game.execute({ type: "CANCEL_PLACEMENT" });
-        } else if (
-          game.state.ui.selectedBuildingId !== undefined ||
-          game.state.ui.selectedUnitIds.length > 0
-        ) {
-          game.execute({ type: "SELECT_BUILDING" });
-          game.execute({ type: "SELECT_UNITS", unitIds: [] });
-        } else if (game.state.ui.buildOpen) {
-          game.execute({ type: "TOGGLE_BUILD", open: false });
         }
+        if (game.state.ui.buildOpen) game.execute({ type: "TOGGLE_BUILD", open: false });
+        if (game.state.status === "playing") setPaused(loop.timeScale !== 0);
+        event.preventDefault();
+        return;
       }
       if (code === "KeyB" && game.state.status === "playing") {
         game.execute({ type: "TOGGLE_BUILD" });
@@ -367,7 +370,7 @@ async function main(): Promise<void> {
         game.execute({ type: "ACTIVATE_HERO" });
       }
       if (code === "Space" && game.state.status === "playing") {
-        loop.timeScale = loop.timeScale === 0 ? 1 : 0;
+        setPaused(loop.timeScale !== 0);
       }
       if (code === "Minus" || code === "NumpadSubtract") {
         loop.timeScale = Math.max(1, loop.timeScale - 1);

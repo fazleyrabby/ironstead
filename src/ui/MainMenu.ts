@@ -17,7 +17,7 @@ const CONTROLS: ControlRow[] = [
   { keys: "A + click", label: "Attack-move" },
   { keys: "S", label: "Stop" },
   { keys: "B", label: "Open the build menu" },
-  { keys: "Esc", label: "Cancel placement or clear selection" },
+  { keys: "Esc", label: "Pause / resume (also cancels placement)" },
   { keys: "Space", label: "Pause / resume" },
   { keys: "+ / \u2212", label: "Game speed" },
   { keys: "1 \u2013 9", label: "Control groups (Ctrl+1\u20139 to set)" },
@@ -52,7 +52,7 @@ export class MainMenu {
     const card = el("div", "menu-card");
     card.append(
       el("div", "menu-kicker", "A BROWSER STRATEGY SKIRMISH"),
-      el("h1", "menu-title", "BROWSER RTS"),
+      el("h1", "menu-title", "IRONSTEAD"),
       el(
         "p",
         "menu-tagline",
