@@ -152,10 +152,38 @@ export function buildWorldScene(world: Container): Container {
   terrain.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).stroke({ width: 6, color: INK, alpha: 0.3 });
 
   for (const b of baseCenters()) {
-    terrain.ellipse(b.x, b.y + 10, 236, 176).fill(STYLE.dirt);
-    terrain.ellipse(b.x, b.y + 10, 236, 176).stroke({ width: 3, color: INK, alpha: 0.22 });
-    terrain.ellipse(b.x, b.y + 4, 196, 140).fill({ color: STYLE.sand, alpha: 0.3 });
-    terrain.ellipse(b.x - 60, b.y - 30, 90, 60).fill({ color: STYLE.dirtDark, alpha: 0.16 });
+    // Seeded, irregular compacted earth: a settlement clearing rather than a
+    // perfect ellipse. All marks are generated once with the terrain.
+    const edge: number[] = [];
+    for (let i = 0; i < 64; i++) {
+      const angle = i / 64 * Math.PI * 2;
+      const radius = 0.93 + rand() * 0.1;
+      edge.push(b.x + Math.cos(angle) * 236 * radius,
+        b.y + 10 + Math.sin(angle) * 176 * radius);
+    }
+    terrain.poly(edge).fill(0xaa956b);
+    terrain.poly(edge).stroke({ width: 2, color: STYLE.dirtDark, alpha: 0.28 });
+    for (let i = 0; i < 260; i++) {
+      const angle = rand() * Math.PI * 2;
+      const radius = Math.sqrt(rand());
+      const x = b.x + Math.cos(angle) * 224 * radius;
+      const y = b.y + 10 + Math.sin(angle) * 163 * radius;
+      if (i % 5 === 0) {
+        terrain.moveTo(x, y).lineTo(x + 3 + rand() * 8, y - 0.5)
+          .stroke({ width: 0.7, color: 0x74664d, alpha: 0.22 });
+      } else {
+        terrain.ellipse(x, y, 0.5 + rand() * 2.3, 0.4 + rand() * 0.8)
+          .fill({ color: i % 2 ? 0xd4c29a : 0x7f7459, alpha: 0.45 });
+      }
+    }
+    for (let i = 0; i < 64; i++) {
+      const angle = i / 64 * Math.PI * 2;
+      const x = b.x + Math.cos(angle) * (227 + rand() * 13);
+      const y = b.y + 10 + Math.sin(angle) * (166 + rand() * 10);
+      terrain.moveTo(x - 3, y).lineTo(x - 4, y - 4).lineTo(x, y)
+        .lineTo(x + 1, y - 6).moveTo(x, y).lineTo(x + 4, y - 3)
+        .stroke({ width: 0.85, color: 0x637546, alpha: 0.8 });
+    }
   }
 
   const territory = new Graphics();
@@ -305,6 +333,10 @@ function drawRoundTree(g: Graphics, x: number, y: number, size: number, autumn: 
     color: leafLight,
     alpha: 0.85,
   });
+  g.ellipse(x + size * 0.24, y - size * 0.38, size * 0.18, size * 0.1).fill({
+    color: autumn ? STYLE.autumnDark : STYLE.leafDark,
+    alpha: 0.52,
+  });
 }
 
 function drawPine(g: Graphics, x: number, y: number, size: number): void {
@@ -315,6 +347,9 @@ function drawPine(g: Graphics, x: number, y: number, size: number): void {
     const ly = y - size * 0.3 - i * size * 0.3;
     const lw = size * (1.1 - i * 0.28);
     inkPoly(g, [x - lw / 2, ly, x + lw / 2, ly, x, ly - size * 0.6], shades[i], 1.8);
+    g.moveTo(x - lw * 0.24, ly - size * 0.13)
+      .lineTo(x - lw * 0.08, ly - size * 0.23)
+      .stroke({ width: 1, color: STYLE.leafLight, alpha: 0.45 });
   }
 }
 
@@ -325,6 +360,7 @@ function drawBush(g: Graphics, x: number, y: number, size: number): void {
     color: STYLE.leafLight,
     alpha: 0.75,
   });
+  g.circle(x + size * 0.2, y + size * 0.05, size * 0.055).fill({ color: STYLE.flowerPink, alpha: 0.8 });
 }
 
 function drawRock(g: Graphics, x: number, y: number, size: number): void {
@@ -338,6 +374,9 @@ function drawRock(g: Graphics, x: number, y: number, size: number): void {
   g.poly([x - size * 0.32, y - size * 0.62, x + size * 0.42, y - size * 0.5, x + size * 0.1, y - size * 0.08, x - size * 0.2, y - size * 0.12]).fill(
     STYLE.stoneLight,
   );
+  g.moveTo(x + size * 0.13, y - size * 0.05)
+    .lineTo(x + size * 0.27, y + size * 0.19)
+    .stroke({ width: 1, color: STYLE.stoneDark, alpha: 0.55 });
 }
 
 function drawStump(g: Graphics, x: number, y: number, size: number): void {
@@ -348,6 +387,11 @@ function drawStump(g: Graphics, x: number, y: number, size: number): void {
     width: 1.2,
     color: STYLE.woodDark,
     alpha: 0.7,
+  });
+  g.ellipse(x, y - size * 0.16, size * 0.31, size * 0.19).stroke({
+    width: 1,
+    color: STYLE.woodDark,
+    alpha: 0.5,
   });
 }
 
@@ -409,6 +453,9 @@ function drawBoulder(g: Graphics, x: number, y: number, size: number): void {
   g.poly([x - size * 0.5, y - size * 0.4, x + size * 0.1, y - size * 0.55, x + size * 0.15, y - size * 0.1, x - size * 0.3, y - size * 0.05]).fill(
     STYLE.stoneLight,
   );
+  g.moveTo(x + size * 0.15, y - size * 0.1)
+    .lineTo(x + size * 0.42, y + size * 0.29)
+    .stroke({ width: 1, color: STYLE.stoneDark, alpha: 0.55 });
   g.ellipse(x - size * 0.2, y - size * 0.25, size * 0.15, size * 0.08).fill({ color: STYLE.leafDark, alpha: 0.5 });
   g.ellipse(x - size * 0.1, y - size * 0.2, size * 0.08, size * 0.05).fill({ color: STYLE.leaf, alpha: 0.4 });
 }

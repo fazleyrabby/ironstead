@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite } from "pixi.js";
-import { PALETTE, worldToTile } from "../config/world";
+import { worldToTile } from "../config/world";
 import { unitDef } from "../sim/selectors";
 import { isTileExplored, isTileVisible } from "../sim/visibility";
 import type { VisibilityMap } from "../sim/visibility";
@@ -7,15 +7,15 @@ import type { GameState, PlayerId, Unit } from "../sim/types";
 import { UNIT_FRAMES, unitTexture, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./Assets";
 import { softShadowTexture } from "./softShadow";
 import { STYLE } from "./style";
+import { medievalCloth, medievalTorso, medievalHead, medievalShield as shieldGraphic } from "./MedievalCharacters";
 
 const FACTION_COLORS: Record<PlayerId, number> = {
-  player: PALETTE.playerUnit,
-  enemy: PALETTE.enemyUnit,
+  player: 0x62889c,
+  enemy: 0xac6d59,
 };
 
-const OUTLINE = PALETTE.outline;
+const OUTLINE = 0x382e28;
 const SKIN = STYLE.skin;
-const SKIN_DARK = STYLE.skinDark;
 const STEEL = STYLE.steel;
 const STEEL_DARK = STYLE.steelDark;
 const LEATHER = STYLE.leather;
@@ -25,7 +25,6 @@ const HORSE = STYLE.horse;
 const HORSE_DARK = STYLE.horseDark;
 
 type AttackKind = "slash" | "thrust" | "shoot" | "tool" | "cavalry";
-type HeadGear = "hood" | "helm" | "cap" | "crown" | "bare";
 
 function shade(color: number, amount: number): number {
   const target = amount < 0 ? 0 : 255;
@@ -39,6 +38,7 @@ interface Rig {
   body: Container;
   torso: Container;
   head: Container;
+  headRestY: number;
   armBack: Container;
   armFront: Container;
   legBack: Container;
@@ -346,7 +346,7 @@ export class UnitRenderer {
     const breathe = Math.sin(nowSec * 2.2) * (0.02 + idle * 0.025);
     rig.torso.y = -bob * 0.25;
     rig.torso.scale.set(1 + breathe * 0.5 - bob * 0.025, 1 - breathe * 1.2 + bob * 0.04);
-    rig.head.y = -bob * 0.15 - r * 0.02 + idle * Math.sin(nowSec * 1.6) * 0.3;
+    rig.head.y = rig.headRestY - bob * 0.15 - r * 0.02 + idle * Math.sin(nowSec * 1.6) * 0.3;
     rig.head.rotation = Math.sin(anim.phase - 0.5) * 0.07 * anim.move + attackK * 0.05 + idle * Math.sin(nowSec * 1.8) * 0.035;
 
     this.drawFx(entry, r, anim);
@@ -389,185 +389,59 @@ export class UnitRenderer {
 
 function limb(color: number, boot: number, length: number, width: number): Graphics {
   const g = new Graphics();
-  g.roundRect(-width / 2, 0, width, length * 0.62, width * 0.45).fill(color);
-  g.roundRect(-width / 2, 0, width, length * 0.62, width * 0.45).stroke({
-    width: 1.8,
-    color: OUTLINE,
-    alpha: 0.9,
-  });
-  g.roundRect(-width * 0.62, length * 0.58, width * 1.24, length * 0.42, width * 0.4).fill(boot);
-  g.roundRect(-width * 0.62, length * 0.58, width * 1.24, length * 0.42, width * 0.4).stroke({
-    width: 1.8,
-    color: OUTLINE,
-    alpha: 0.9,
-  });
+  g.poly([-width*.5,0,width*.5,0,width*.38,length*.68,-width*.36,length*.68])
+    .fill(color).stroke({width:.75,color:OUTLINE});
+  g.moveTo(-width*.18,length*.1).lineTo(-width*.07,length*.55)
+    .stroke({width:.45,color:shade(color,-.32)});
+  g.poly([-width*.42,length*.6,width*.42,length*.6,width*.4,length*.86,
+    width*.7,length*.94,width*.65,length,-width*.43,length])
+    .fill(boot).stroke({width:.75,color:OUTLINE});
+  g.moveTo(-width*.35,length*.67).lineTo(width*.34,length*.67)
+    .stroke({width:.55,color:0x9b8059});
+  for (const t of [.75,.84]) {
+    g.moveTo(-width*.15,length*t).lineTo(width*.17,length*(t+.035))
+      .stroke({width:.4,color:0xb19b72});
+  }
   return g;
 }
 
 function arm(color: number, skin: number, length: number, width: number): Graphics {
   const g = new Graphics();
-  g.roundRect(-width / 2, 0, width, length * 0.7, width * 0.45).fill(color);
-  g.roundRect(-width / 2, 0, width, length * 0.7, width * 0.45).stroke({
-    width: 1.7,
-    color: OUTLINE,
-    alpha: 0.9,
-  });
-  g.circle(0, length * 0.72, width * 0.62).fill(skin);
-  g.circle(0, length * 0.72, width * 0.62).stroke({ width: 1.5, color: OUTLINE, alpha: 0.85 });
+  // The sleeve extends above the shoulder pivot and into the coat. An open
+  // shoulder contour avoids the detached, outlined capsule of the old rig.
+  const sleeve = [-width*.66,-length*.16, width*.64,-length*.16,
+    width*.57,length*.27, width*.42,length*.64,
+    -width*.43,length*.64, -width*.57,length*.27];
+  g.poly(sleeve).fill(color);
+  g.moveTo(width*.64,-length*.12).lineTo(width*.57,length*.27)
+    .lineTo(width*.42,length*.64).lineTo(-width*.43,length*.64)
+    .lineTo(-width*.57,length*.27)
+    .stroke({width:.65,color:OUTLINE,alpha:.8});
+  g.moveTo(-width*.2,length*.17).lineTo(width*.19,length*.32)
+    .lineTo(-width*.14,length*.4)
+    .stroke({width:.4,color:shade(color,-.25),alpha:.65});
+  // A short mitten shares its wrist with the cuff instead of floating below it.
+  g.poly([-width*.38,length*.6,width*.38,length*.6,
+    width*.63,length*.75,width*.36,length*.86,-width*.5,length*.82])
+    .fill(skin).stroke({width:.55,color:OUTLINE,alpha:.85});
+  g.poly([-width*.44,length*.55,width*.44,length*.55,
+    width*.42,length*.65,-width*.43,length*.65])
+    .fill(shade(color,-.16));
+  g.moveTo(-width*.4,length*.59).lineTo(width*.4,length*.59)
+    .stroke({width:.4,color:0xc8b88f,alpha:.8});
   return g;
 }
 
-function torsoGraphic(
-  r: number,
-  tunic: number,
-  cape: number | undefined,
-  gear?: "pauldron" | "belt",
-  role?: Unit["type"],
-): Graphics {
+// Draw the fingers after the held tool, so the shaft visibly passes through
+// the palm instead of hiding it. This shares the sleeve's animated arm pivot.
+function handGrip(length: number, width: number): Graphics {
   const g = new Graphics();
-  const w = r * 1.08;
-  const h = r * 0.98;
-  if (cape !== undefined) {
-    g.poly([-w * 0.7, -h * 0.08, w * 0.7, -h * 0.08, w * 0.42, h * 1.15, -w * 0.42, h * 1.15]).fill(cape);
-    g.poly([-w * 0.7, -h * 0.08, w * 0.7, -h * 0.08, w * 0.42, h * 1.15, -w * 0.42, h * 1.15]).stroke({
-      width: 1.8,
-      color: OUTLINE,
-      alpha: 0.85,
-    });
-    g.poly([-w * 0.7, -h * 0.08, -w * 0.1, -h * 0.08, -w * 0.12, h * 0.5, -w * 0.52, h * 0.6]).fill({ color: shade(cape, 0.15), alpha: 0.4 });
-  }
-  g.roundRect(-w / 2, -h / 2, w, h, r * 0.42).fill(tunic);
-  g.roundRect(-w / 2, -h / 2, w, h, r * 0.42).stroke({ width: 2.1, color: OUTLINE, alpha: 0.9 });
-  g.roundRect(-w / 2, h * 0.16, w, h * 0.16, r * 0.1).fill(shade(tunic, -0.35));
-  g.ellipse(-w * 0.22, -h * 0.2, w * 0.26, h * 0.22).fill({ color: shade(tunic, 0.3), alpha: 0.45 });
-  // A high-contrast surcoat keeps faction ownership legible at gameplay zoom.
-  if (role !== "villager") {
-    g.poly([-w * 0.2, -h * 0.42, w * 0.2, -h * 0.42, w * 0.15, h * 0.35, 0, h * 0.5, -w * 0.15, h * 0.35])
-      .fill(shade(tunic, 0.32));
-    g.circle(0, -h * 0.02, r * 0.11).fill(STYLE.gold);
-    g.circle(0, -h * 0.02, r * 0.11).stroke({ width: 1, color: OUTLINE, alpha: 0.75 });
-  }
-  if (gear === "pauldron") {
-    g.ellipse(-w * 0.52, -h * 0.36, w * 0.22, h * 0.18).fill(STEEL);
-    g.ellipse(-w * 0.52, -h * 0.36, w * 0.22, h * 0.18).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
-    g.ellipse(-w * 0.52, -h * 0.44, w * 0.14, h * 0.08).fill({ color: shade(STEEL, 0.3), alpha: 0.5 });
-    g.ellipse(w * 0.52, -h * 0.36, w * 0.22, h * 0.18).fill(STEEL_DARK);
-    g.ellipse(w * 0.52, -h * 0.36, w * 0.22, h * 0.18).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
-  } else if (gear === "belt") {
-    g.roundRect(-w * 0.48, h * 0.02, w * 0.96, h * 0.12, r * 0.06).fill(LEATHER);
-    g.roundRect(-w * 0.48, h * 0.02, w * 0.96, h * 0.12, r * 0.06).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
-    g.roundRect(w * 0.12, h * 0.0, h * 0.16, h * 0.16, r * 0.04).fill(shade(LEATHER, -0.2));
-    g.roundRect(w * 0.12, h * 0.0, h * 0.16, h * 0.16, r * 0.04).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
-  }
-  return g;
-}
-
-function headGraphic(r: number, faction: number, gear: HeadGear, role?: Unit["type"]): Graphics {
-  const g = new Graphics();
-  const hr = r * 0.62;
-  g.roundRect(-hr * 0.34, hr * 0.35, hr * 0.68, hr * 1.15, hr * 0.22).fill(SKIN_DARK);
-  g.roundRect(-hr * 0.34, hr * 0.35, hr * 0.68, hr * 1.15, hr * 0.22).stroke({
-    width: 1.6,
-    color: OUTLINE,
-    alpha: 0.85,
-  });
-  g.circle(0, 0, hr).fill(SKIN);
-  g.circle(0, 0, hr).stroke({ width: 2, color: OUTLINE, alpha: 0.9 });
-  g.ellipse(-hr * 0.3, hr * 0.18, hr * 0.26, hr * 0.2).fill({ color: SKIN_DARK, alpha: 0.5 });
-
-  const dome = (color: number): void => {
-    g.moveTo(-hr * 1.02, -hr * 0.06)
-      .arc(0, -hr * 0.06, hr * 1.02, Math.PI, 0, false)
-      .lineTo(-hr * 1.02, -hr * 0.06)
-      .fill(color)
-      .stroke({ width: 1.9, color: OUTLINE, alpha: 0.9 });
-  };
-
-  if (gear === "hood") {
-    dome(shade(faction, -0.34));
-    g.moveTo(-hr * 1.02, -hr * 0.06).lineTo(hr * 1.02, -hr * 0.06).stroke({
-      width: 1.6,
-      color: OUTLINE,
-      alpha: 0.6,
-    });
-  } else if (gear === "helm") {
-    dome(STEEL);
-    g.ellipse(0, -hr * 0.06, hr * 1.08, hr * 0.12).fill(STEEL_DARK);
-    g.rect(-hr * 0.1, -hr * 0.1, hr * 0.2, hr * 0.75).fill(STEEL_DARK);
-    g.ellipse(-hr * 0.4, -hr * 0.6, hr * 0.3, hr * 0.18).fill({ color: shade(STEEL, 0.25), alpha: 0.45 });
-    g.poly([-hr * 0.14, -hr * 1.1, hr * 0.14, -hr * 1.1, 0, -hr * 1.6]).fill(STEEL_DARK);
-    g.poly([-hr * 0.14, -hr * 1.1, hr * 0.14, -hr * 1.1, 0, -hr * 1.6]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.75 });
-    if (role === "spearman") {
-      g.rect(-hr * 0.92, -hr * 0.1, hr * 0.25, hr * 0.72).fill(STEEL_DARK);
-      g.rect(hr * 0.67, -hr * 0.1, hr * 0.25, hr * 0.72).fill(STEEL_DARK);
-      g.poly([-hr * 0.12, -hr * 1.48, hr * 0.12, -hr * 1.48, hr * 0.5, -hr * 2.0, -hr * 0.5, -hr * 2.0]).fill(faction);
-      g.poly([-hr * 0.12, -hr * 1.48, hr * 0.12, -hr * 1.48, hr * 0.5, -hr * 2.0, -hr * 0.5, -hr * 2.0]).stroke({ width: 1, color: OUTLINE, alpha: 0.75 });
-    } else if (role === "swordsman") {
-      g.rect(-hr * 1.12, -hr * 0.12, hr * 2.24, hr * 0.18).fill(STEEL_DARK);
-    }
-  } else if (gear === "cap") {
-    dome(LEATHER);
-    g.rect(-hr * 1.16, -hr * 0.2, hr * 2.32, hr * 0.2).fill(shade(LEATHER, -0.25));
-    g.ellipse(-hr * 0.4, -hr * 0.55, hr * 0.28, hr * 0.15).fill({ color: shade(LEATHER, 0.2), alpha: 0.4 });
-    g.poly([hr * 0.5, -hr * 1.05, hr * 2.0, -hr * 1.85, hr * 1.1, -hr * 0.55]).fill(0xc792ea);
-    g.poly([hr * 0.5, -hr * 1.05, hr * 2.0, -hr * 1.85, hr * 1.1, -hr * 0.55]).stroke({
-      width: 1.2,
-      color: OUTLINE,
-      alpha: 0.7,
-    });
-    g.poly([hr * 0.55, -hr * 1.05, hr * 1.85, -hr * 1.8, hr * 1.6, -hr * 1.55]).fill({ color: shade(0xc792ea, 0.25), alpha: 0.5 });
-  } else if (gear === "crown") {
-    dome(shade(faction, -0.2));
-    g.rect(-hr * 1.0, -hr * 1.25, hr * 2.0, hr * 0.4).fill(GOLD);
-    g.rect(-hr * 1.0, -hr * 1.25, hr * 2.0, hr * 0.4).stroke({ width: 1.5, color: OUTLINE, alpha: 0.85 });
-    g.rect(-hr * 1.0, -hr * 1.25, hr * 2.0, hr * 0.12).fill({ color: shade(GOLD, 0.35), alpha: 0.5 });
-    for (const px of [-hr * 0.7, 0, hr * 0.7]) {
-      g.poly([px - hr * 0.2, -hr * 1.25, px + hr * 0.2, -hr * 1.25, px, -hr * 1.8]).fill(GOLD);
-      g.poly([px - hr * 0.2, -hr * 1.25, px + hr * 0.2, -hr * 1.25, px, -hr * 1.8]).stroke({ width: 1.1, color: OUTLINE, alpha: 0.7 });
-    }
-    g.circle(0, -hr * 1.08, hr * 0.16).fill(0x9b1c2e);
-    g.circle(-hr * 0.06, -hr * 1.12, hr * 0.06).fill({ color: 0xffffff, alpha: 0.6 });
-  } else {
-    dome(LEATHER);
-  }
-  g.circle(-hr * 0.34, hr * 0.12, hr * 0.13).fill(OUTLINE);
-  g.circle(hr * 0.34, hr * 0.12, hr * 0.13).fill(OUTLINE);
-  return g;
-}
-
-function headGear(type: Unit["type"]): HeadGear {
-  switch (type) {
-    case "villager":
-      return "hood";
-    case "crossbowman":
-      return "cap";
-    case "hero":
-      return "crown";
-    case "swordsman":
-    case "spearman":
-    case "horse_rider":
-      return "helm";
-    default:
-      return "bare";
-  }
-}
-
-function shieldGraphic(r: number, kind: "kite" | "round", color: number): Graphics {
-  const g = new Graphics();
-  if (kind === "kite") {
-    g.poly([-r * 0.4, -r * 0.5, r * 0.4, -r * 0.5, r * 0.3, r * 0.4, 0, r * 0.75, -r * 0.3, r * 0.4]).fill(color);
-    g.poly([-r * 0.4, -r * 0.5, r * 0.4, -r * 0.5, r * 0.3, r * 0.4, 0, r * 0.75, -r * 0.3, r * 0.4]).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
-    g.poly([-r * 0.4, -r * 0.5, -r * 0.1, -r * 0.5, -r * 0.05, r * 0.3, -r * 0.3, r * 0.4]).fill({ color: shade(color, 0.25), alpha: 0.4 });
-    g.rect(-r * 0.04, -r * 0.5, r * 0.08, r * 1.2).fill({ color: shade(color, -0.3), alpha: 0.5 });
-    g.rect(-r * 0.35, -r * 0.04, r * 0.7, r * 0.08).fill({ color: shade(color, -0.3), alpha: 0.5 });
-  } else {
-    g.circle(0, 0, r * 0.52).fill(color);
-    g.circle(0, 0, r * 0.52).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
-    g.circle(0, 0, r * 0.38).stroke({ width: 1.2, color: shade(color, -0.3), alpha: 0.4 });
-    g.circle(0, 0, r * 0.15).fill(shade(color, -0.2));
-    g.circle(0, 0, r * 0.15).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
-    g.ellipse(-r * 0.18, -r * 0.2, r * 0.16, r * 0.1).fill({ color: shade(color, 0.3), alpha: 0.4 });
-  }
+  g.poly([-width*.51,length*.68,width*.38,length*.68,
+    width*.61,length*.73,width*.48,length*.82,-width*.37,length*.82,
+    -width*.58,length*.76])
+    .fill(SKIN).stroke({width:.5,color:OUTLINE});
+  g.moveTo(width*.12,length*.72).lineTo(width*.48,length*.74)
+    .stroke({width:.4,color:0xb18a60});
   return g;
 }
 
@@ -589,25 +463,25 @@ function buildRig(unit: Unit): Rig {
   const back = shade(faction, -0.4);
   const boot = STYLE.boot;
 
-  const legLength = r * 1.25;
+  const legLength = r * 1.4;
   const legWidth = r * 0.44;
   const legBack = pivot(limb(back, boot, legLength, legWidth), -r * 0.3, r * 0.34);
   const legFront = pivot(limb(faction, boot, legLength, legWidth), r * 0.3, r * 0.34);
 
   const torso = new Container();
   torso.position.set(0, r * 0.02);
-  const torsoGear = (type === "swordsman" || type === "spearman") ? "pauldron" as const : type === "villager" ? "belt" as const : undefined;
-  torso.addChild(torsoGraphic(r, faction, type === "hero" ? shade(faction, -0.45) : undefined, torsoGear, type));
+  torso.addChild(medievalTorso(r, faction, type));
 
-  const head = pivot(headGraphic(r, faction, headGear(type), type), 0, -r * 1.3);
+  const head = pivot(medievalHead(r, faction, type), 0, -r * 1.05);
 
-  const armLength = r * 1.08;
-  const armWidth = r * 0.34;
-  const armBack = pivot(arm(back, SKIN, armLength, armWidth), -r * 0.8, -r * 0.1);
-  const armFront = pivot(arm(faction, SKIN, armLength, armWidth), r * 0.8, -r * 0.1);
+  const sleeveColor = medievalCloth(faction, type);
+  const armLength = r * 1.1;
+  const armWidth = r * 0.4;
+  const armBack = pivot(arm(shade(sleeveColor, -0.12), SKIN, armLength, armWidth), -r * 0.48, -r * 0.36);
+  const armFront = pivot(arm(sleeveColor, SKIN, armLength, armWidth), r * 0.48, -r * 0.36);
   const weapon = buildWeapon(type);
   weapon.position.set(0, armLength * 0.72);
-  armFront.addChild(weapon);
+  armFront.addChild(weapon, handGrip(armLength, armWidth));
 
   if (type === "swordsman") {
     const shield = shieldGraphic(r, "kite", faction);
@@ -620,9 +494,9 @@ function buildRig(unit: Unit): Rig {
   } else if (type === "crossbowman") {
     const quiver = new Graphics();
     quiver.roundRect(-r * 0.18, -r * 0.45, r * 0.36, r * 1.05, r * 0.12).fill(LEATHER);
-    quiver.roundRect(-r * 0.18, -r * 0.45, r * 0.36, r * 1.05, r * 0.12).stroke({ width: 1.3, color: OUTLINE, alpha: 0.85 });
+    quiver.roundRect(-r * 0.18, -r * 0.45, r * 0.36, r * 1.05, r * 0.12).stroke({ width: 0.81, color: OUTLINE, alpha: 0.85 });
     for (const x of [-0.11, 0, 0.11]) {
-      quiver.moveTo(r * x, -r * 0.52).lineTo(r * x, -r * 1.0).stroke({ width: 1.2, color: STYLE.woodLight });
+      quiver.moveTo(r * x, -r * 0.52).lineTo(r * x, -r * 1.0).stroke({ width: 0.74, color: STYLE.woodLight });
       quiver.poly([r * x - 1.8, -r * 0.95, r * x + 1.8, -r * 0.95, r * x, -r * 1.12]).fill(STYLE.steel);
     }
     quiver.rotation = -0.28;
@@ -630,20 +504,24 @@ function buildRig(unit: Unit): Rig {
     armBack.addChild(quiver);
   }
 
-  body.addChild(legBack, armBack, torso, legFront, head, armFront);
+  // Shoulder pivots inherit the coat's breathing/bob, so they cannot drift away.
+  torso.addChildAt(armBack, 0);
+  torso.addChild(armFront);
+  body.addChild(legBack, legFront, torso, head);
 
   return {
     root,
     body,
     torso,
     head,
+    headRestY: head.y,
     armBack,
     armFront,
     legBack,
     legFront,
     walkSwing: type === "villager" ? 0.55 : 0.7,
     armSwing: 0.55,
-    armSpread: 0.14,
+    armSpread: -0.18,
     stride: type === "villager" ? 8 : 7.2,
     twoHanded: type === "crossbowman",
     attackKind: attackKindFor(type),
@@ -677,33 +555,49 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
   const g = new Graphics();
   g.roundRect(-hr, -r * 0.55, hr * 2, r * 1.1, r * 0.45).fill(HORSE);
   g.roundRect(-hr, -r * 0.55, hr * 2, r * 1.1, r * 0.45).stroke({
-    width: 2.2,
+    width: 1.36,
     color: OUTLINE,
     alpha: 0.9,
   });
   g.ellipse(-r * 0.3, -r * 0.25, r * 0.75, r * 0.32).fill({ color: shade(HORSE, 0.2), alpha: 0.45 });
   g.ellipse(r * 0.3, r * 0.1, r * 0.6, r * 0.25).fill({ color: HORSE_DARK, alpha: 0.3 });
   g.roundRect(-hr * 0.3, -r * 0.42, hr * 0.65, r * 0.32, r * 0.1).fill(faction);
-  g.roundRect(-hr * 0.3, -r * 0.42, hr * 0.65, r * 0.32, r * 0.1).stroke({ width: 1.2, color: OUTLINE, alpha: 0.7 });
+  g.roundRect(-hr * 0.3, -r * 0.42, hr * 0.65, r * 0.32, r * 0.1).stroke({ width: 0.74, color: OUTLINE, alpha: 0.7 });
+  g.moveTo(-r * 0.48, -r * 0.25).lineTo(r * 0.52, -r * 0.25)
+    .stroke({ width: 0.87, color: LEATHER, alpha: 0.9 });
+  g.circle(r * 0.1, -r * 0.25, r * 0.08).fill(STYLE.goldDark);
   g.roundRect(r * 0.75, -r * 1.45, r * 0.55, r * 1.3, r * 0.22).fill(HORSE);
   g.roundRect(r * 0.75, -r * 1.45, r * 0.55, r * 1.3, r * 0.22).stroke({
-    width: 2,
+    width: 1.24,
     color: OUTLINE,
     alpha: 0.9,
   });
   for (let i = 0; i < 5; i += 1) {
     const mx = r * 0.78 + i * r * 0.08;
     const my = -r * 1.5 - i * r * 0.04;
-    g.moveTo(mx, my).lineTo(mx - r * 0.15, my + r * 0.35).stroke({ width: 1.8, color: HORSE_DARK, alpha: 0.7 });
+    g.moveTo(mx, my).lineTo(mx - r * 0.15, my + r * 0.35).stroke({ width: 1.12, color: HORSE_DARK, alpha: 0.7 });
   }
   g.ellipse(r * 1.45, -r * 1.5, r * 0.45, r * 0.32).fill(HORSE);
-  g.ellipse(r * 1.45, -r * 1.5, r * 0.45, r * 0.32).stroke({ width: 1.8, color: OUTLINE, alpha: 0.9 });
+  g.ellipse(r * 1.45, -r * 1.5, r * 0.45, r * 0.32).stroke({ width: 1.12, color: OUTLINE, alpha: 0.9 });
   g.ellipse(r * 1.6, -r * 1.48, r * 0.14, r * 0.1).fill({ color: shade(HORSE, 0.2), alpha: 0.5 });
   g.circle(r * 1.65, -r * 1.55, r * 0.09).fill(OUTLINE);
   g.circle(r * 1.62, -r * 1.58, r * 0.03).fill({ color: 0xffffff, alpha: 0.6 });
+  g.moveTo(r * 1.2, -r * 1.34)
+    .quadraticCurveTo(r * 1.65, -r * 0.62, r * 0.55, -r * 0.18)
+    .stroke({ width: 0.74, color: LEATHER, alpha: 0.9 });
   g.poly([r * 0.9, -r * 1.6, r * 1.05, -r * 2.0, r * 1.18, -r * 1.58]).fill(HORSE_DARK);
   g.poly([-hr, -r * 0.35, -hr + r * 0.3, -r * 0.4, -hr - r * 0.5, r * 0.45]).fill(HORSE_DARK);
   g.poly([-hr - r * 0.3, r * 0.2, -hr - r * 0.55, r * 0.5, -hr - r * 0.15, r * 0.5]).fill({ color: HORSE_DARK, alpha: 0.7 });
+  g.poly([-r * .85,-r * .35,r * .4,-r * .35,r * .55,r * .65,-r * .72,r * .72])
+    .fill(faction).stroke({width:.8,color:OUTLINE});
+  g.moveTo(-r*.7,-r*.22).lineTo(-r*.58,r*.58).lineTo(r*.39,r*.52).lineTo(r*.29,-r*.22)
+    .stroke({width:.65,color:0xc0a367});
+  for(let i=0;i<5;i++) {
+    const x=r*(-.53+i*.18);
+    g.poly([x,r*.34,x+r*.055,r*.43,x,r*.52,x-r*.055,r*.43]).fill(0xc0a367);
+  }
+  g.moveTo(r*.03,-r*.24).lineTo(r*.03,r*.57).stroke({width:1.1,color:LEATHER});
+  g.ellipse(r*.03,r*.64,r*.13,r*.12).stroke({width:.8,color:STEEL});
   horseBody.addChild(g);
 
   const legWidth = r * 0.32;
@@ -712,7 +606,7 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
     const lg = new Graphics();
     lg.roundRect(-legWidth / 2, 0, legWidth, legLen, legWidth * 0.4).fill(color);
     lg.roundRect(-legWidth / 2, 0, legWidth, legLen, legWidth * 0.4).stroke({
-      width: 1.6,
+      width: 0.99,
       color: OUTLINE,
       alpha: 0.9,
     });
@@ -728,14 +622,14 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
 
   const backArm = pivot(arm(shade(faction, -0.35), SKIN, r * 1.15, r * 0.34), -r * 0.4, -r * 0.28);
   const torsoHolder = new Container();
-  torsoHolder.addChild(torsoGraphic(r * 1.2, faction, shade(faction, -0.35), undefined, "horse_rider"));
-  const riderHead = pivot(headGraphic(r * 1.2, faction, "helm", "horse_rider"), 0, -r * 1.0);
+  torsoHolder.addChild(medievalTorso(r * 1.2, faction, "horse_rider"));
+  const riderHead = pivot(medievalHead(r * 1.2, faction, "horse_rider"), 0, -r * 1.0);
   const frontArm = pivot(arm(faction, SKIN, r * 1.15, r * 0.36), r * 0.44, -r * 0.26);
 
   const lance = new Graphics();
   lance.roundRect(0, -r * 0.08, r * 2.8, r * 0.16, r * 0.06).fill(WOOD);
   lance.roundRect(0, -r * 0.08, r * 2.8, r * 0.16, r * 0.06).stroke({
-    width: 1.3,
+    width: 0.81,
     color: OUTLINE,
     alpha: 0.85,
   });
@@ -743,9 +637,11 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
   lance.poly([r * 2.72, -r * 0.24, r * 2.72, r * 0.28, r * 3.15, r * 0.02]).fill(STEEL);
   lance.poly([r * 2.72, -r * 0.24, r * 2.72, r * 0.28, r * 3.15, r * 0.02]).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
   lance.position.set(0, r * 0.82);
-  frontArm.addChild(lance);
+  frontArm.addChild(lance, handGrip(r * 1.15, r * .36));
 
-  rider.addChild(backArm, torsoHolder, riderHead, frontArm);
+  torsoHolder.addChildAt(backArm, 0);
+  torsoHolder.addChild(frontArm);
+  rider.addChild(torsoHolder, riderHead);
   body.addChild(horse, rider);
 
   return {
@@ -753,6 +649,7 @@ function buildHorseRig(r: number, faction: number, root: Container, body: Contai
     body,
     torso: torsoHolder,
     head: riderHead,
+    headRestY: riderHead.y,
     armBack: backArm,
     armFront: frontArm,
     legBack: horseLegBack,
@@ -783,13 +680,13 @@ function buildWeapon(type: Unit["type"]): Container {
   switch (type) {
     case "villager": {
       g.roundRect(-1.3, -r * 0.55, 2.6, r * 0.6, 1.3).fill(WOOD);
-      g.roundRect(-1.3, -r * 0.55, 2.6, r * 0.6, 1.3).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.roundRect(-1.3, -r * 0.55, 2.6, r * 0.6, 1.3).stroke({ width: 0.74, color: OUTLINE, alpha: 0.8 });
       g.moveTo(1.3, -r * 0.5)
         .quadraticCurveTo(r * 1.0, -r * 1.05, 0.0, -r * 1.2)
         .stroke({ width: 2.4, color: STEEL });
       g.moveTo(0.8, -r * 0.5)
         .quadraticCurveTo(r * 0.8, -r * 0.85, 0.0, -r * 1.0)
-        .stroke({ width: 1.2, color: shade(STEEL, 0.3), alpha: 0.5 });
+        .stroke({ width: 0.74, color: shade(STEEL, 0.3), alpha: 0.5 });
       break;
     }
     case "swordsman": {
@@ -799,28 +696,28 @@ function buildWeapon(type: Unit["type"]): Container {
       g.rect(-4.8, -r * 0.38, 9.6, 1.2).fill({ color: shade(GOLD, 0.3), alpha: 0.5 });
       g.rect(-4.8, -r * 0.38, 9.6, 2.8).stroke({ width: 1, color: OUTLINE, alpha: 0.7 });
       g.roundRect(-1.8, -r * 1.95, 3.6, r * 1.6, 1.4).fill(STEEL);
-      g.roundRect(-1.8, -r * 1.95, 3.6, r * 1.6, 1.4).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+      g.roundRect(-1.8, -r * 1.95, 3.6, r * 1.6, 1.4).stroke({ width: 0.87, color: OUTLINE, alpha: 0.85 });
       g.rect(-0.5, -r * 1.9, 1.0, r * 1.5).fill({ color: shade(STEEL, 0.3), alpha: 0.35 });
       g.poly([-1.8, -r * 1.95, 1.8, -r * 1.95, 0, -r * 2.35]).fill(STEEL);
-      g.poly([-1.8, -r * 1.95, 1.8, -r * 1.95, 0, -r * 2.35]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.poly([-1.8, -r * 1.95, 1.8, -r * 1.95, 0, -r * 2.35]).stroke({ width: 0.74, color: OUTLINE, alpha: 0.8 });
       break;
     }
     case "spearman": {
       g.roundRect(-1.3, -r * 2.8, 2.6, r * 3.2, 1.2).fill(WOOD);
-      g.roundRect(-1.3, -r * 2.8, 2.6, r * 3.2, 1.2).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.roundRect(-1.3, -r * 2.8, 2.6, r * 3.2, 1.2).stroke({ width: 0.74, color: OUTLINE, alpha: 0.8 });
       g.rect(-0.4, -r * 2.0, 0.8, r * 2.0).fill({ color: shade(WOOD, 0.15), alpha: 0.3 });
       g.poly([-3, -r * 2.8, 3, -r * 2.8, 0, -r * 3.55]).fill(STEEL);
-      g.poly([-3, -r * 2.8, 3, -r * 2.8, 0, -r * 3.55]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.poly([-3, -r * 2.8, 3, -r * 2.8, 0, -r * 3.55]).stroke({ width: 0.74, color: OUTLINE, alpha: 0.8 });
       g.rect(-0.3, -r * 3.5, 0.6, r * 0.8).fill({ color: shade(STEEL, 0.3), alpha: 0.4 });
       break;
     }
     case "crossbowman": {
       g.roundRect(-r * 0.4, -1.8, r * 1.9, 3.6, 1.4).fill(WOOD);
-      g.roundRect(-r * 0.4, -1.8, r * 1.9, 3.6, 1.4).stroke({ width: 1.2, color: OUTLINE, alpha: 0.85 });
+      g.roundRect(-r * 0.4, -1.8, r * 1.9, 3.6, 1.4).stroke({ width: 0.74, color: OUTLINE, alpha: 0.85 });
       g.rect(-r * 0.2, -0.6, r * 1.2, 1.2).fill({ color: shade(WOOD, 0.15), alpha: 0.3 });
       g.moveTo(r * 1.45, -4.0)
         .quadraticCurveTo(r * 1.9, 0, r * 1.45, 4.0)
-        .stroke({ width: 2.2, color: STEEL_DARK });
+        .stroke({ width: 1.36, color: STEEL_DARK });
       g.moveTo(r * 1.45, -4.0).lineTo(r * 1.0, 0).lineTo(r * 1.45, 4.0).stroke({
         width: 1.1,
         color: 0xf5f5f5,
@@ -837,10 +734,10 @@ function buildWeapon(type: Unit["type"]): Container {
       g.circle(-4.5, -r * 0.26, 1.4).fill(0x9b1c2e);
       g.circle(4.5, -r * 0.26, 1.4).fill(0x9b1c2e);
       g.roundRect(-2.0, -r * 2.15, 4.0, r * 1.75, 1.4).fill(0xf6f1d6);
-      g.roundRect(-2.0, -r * 2.15, 4.0, r * 1.75, 1.4).stroke({ width: 1.4, color: OUTLINE, alpha: 0.85 });
+      g.roundRect(-2.0, -r * 2.15, 4.0, r * 1.75, 1.4).stroke({ width: 0.87, color: OUTLINE, alpha: 0.85 });
       g.rect(-0.5, -r * 2.1, 1.0, r * 1.65).fill({ color: 0xffffff, alpha: 0.2 });
       g.poly([-2.0, -r * 2.15, 2.0, -r * 2.15, 0, -r * 2.55]).fill(0xf6f1d6);
-      g.poly([-2.0, -r * 2.15, 2.0, -r * 2.15, 0, -r * 2.55]).stroke({ width: 1.2, color: OUTLINE, alpha: 0.8 });
+      g.poly([-2.0, -r * 2.15, 2.0, -r * 2.15, 0, -r * 2.55]).stroke({ width: 0.74, color: OUTLINE, alpha: 0.8 });
       break;
     }
     default:
