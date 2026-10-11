@@ -1,4 +1,5 @@
 import { Application, Container } from "pixi.js";
+import { ATMOSPHERE } from "./config/atmosphere";
 import { MAP_LAYOUT } from "./config/map";
 import { GRID_COLS, GRID_ROWS, TILE_SIZE, worldToTile } from "./config/world";
 import { EventBus } from "./core/EventBus";
@@ -8,7 +9,9 @@ import { loadGameAssets, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./re
 import { BuildingRenderer } from "./render/BuildingRenderer";
 import { Camera } from "./render/Camera";
 import { FogRenderer } from "./render/FogRenderer";
+import { LightRenderer } from "./render/LightRenderer";
 import { PlacementGhost } from "./render/PlacementGhost";
+import { PostFX } from "./render/PostFX";
 import { ProjectileRenderer } from "./render/ProjectileRenderer";
 import { SelectionBox } from "./render/SelectionBox";
 import { UnitRenderer } from "./render/UnitRenderer";
@@ -57,16 +60,20 @@ async function main(): Promise<void> {
   mount.appendChild(app.canvas);
 
   const world = new Container();
+  // Untransformed wrapper: post-FX filters sit here so their area stays in screen space.
+  const scene = new Container();
+  scene.addChild(world);
   const screenLayer = new Container();
-  app.stage.addChild(world, screenLayer);
+  app.stage.addChild(scene, screenLayer);
   buildWorldScene(world);
 
   const entityLayer = new Container();
   entityLayer.sortableChildren = true;
   const projectileLayer = new Container();
+  const lightLayer = new Container();
   const ghostLayer = new Container();
   const fogLayer = new Container();
-  world.addChild(entityLayer, projectileLayer, ghostLayer, fogLayer);
+  world.addChild(entityLayer, projectileLayer, lightLayer, ghostLayer, fogLayer);
 
   const events = new EventBus();
   const game = new Game(events);
@@ -84,6 +91,13 @@ async function main(): Promise<void> {
   const projectileRenderer = new ProjectileRenderer(projectileLayer);
   const fog = new FogRenderer(fogLayer, GRID_COLS, GRID_ROWS);
   const ghost = new PlacementGhost(ghostLayer);
+  const lights = ATMOSPHERE.enabled ? new LightRenderer(lightLayer, app.renderer) : undefined;
+  const postFx = ATMOSPHERE.enabled ? new PostFX(app.renderer.resolution) : undefined;
+  if (postFx) {
+    // Pin the filter to the viewport so its UVs are screen-relative at any zoom.
+    scene.filterArea = app.screen;
+    scene.filters = [postFx.filter];
+  }
   const selectionBox = new SelectionBox(screenLayer);
   const sfx = new SoundFX();
   const hud = new Hud(hudTop, {
@@ -479,6 +493,8 @@ async function main(): Promise<void> {
       );
       projectileRenderer.update(game.state.projectiles);
       fog.update(game.visibility.player);
+      lights?.update(game.state, game.visibility.player, performance.now() / 1000);
+      postFx?.update(camera.zoomLevel());
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state, loop.timeScale);
       commandPanel.update(game.state);
