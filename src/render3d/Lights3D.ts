@@ -154,9 +154,9 @@ export class Lights3D {
       }
       const { building, radius } = entry;
       const flicker = 1 + 0.06 * Math.sin(time * 6.3 + building.x * 0.37 + building.y * 0.11);
-      light.position.set(building.x, 40, building.y + building.height * 0.72);
+      light.position.set(building.x, 58, building.y + building.height * 0.72);
       light.distance = radius * 1.9;
-      light.intensity = radius * radius * 0.2 * flicker;
+      light.intensity = radius * radius * 0.085 * flicker;
     });
 
     const positions = this.flies.geometry.attributes.position as BufferAttribute;
@@ -199,7 +199,7 @@ export class Lights3D {
         new SpriteMaterial({
           map: this.glow,
           color: VIEW3D.lighting.buildingLight,
-          opacity: 0.42,
+          opacity: 0.26,
           blending: AdditiveBlending,
           depthWrite: false,
         }),
