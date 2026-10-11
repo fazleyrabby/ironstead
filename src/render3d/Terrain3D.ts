@@ -14,8 +14,8 @@ import { VIEW3D } from "../config/atmosphere";
 import { WORLD_HEIGHT, WORLD_WIDTH } from "../config/world";
 import { buildWorldScene } from "../render/WorldScene";
 import { addProps } from "./Props3D";
+import type { Quality } from "./quality";
 
-const GROUND_RESOLUTION = 1.5;
 function strataTexture(): CanvasTexture {
   const width = 512;
   const height = 128;
@@ -58,13 +58,13 @@ function strataTexture(): CanvasTexture {
 
 // The flat terrain art (grass, road, ponds, flowers) is still drawn with Pixi
 // Graphics; it is rendered once here and copied into a plain 2D canvas.
-async function bakeGround(ground: Container): Promise<HTMLCanvasElement> {
+async function bakeGround(ground: Container, resolution: number): Promise<HTMLCanvasElement> {
   const app = new Application();
   await app.init({ width: 8, height: 8, preference: "webgl", autoStart: false, antialias: true });
   const baked = app.renderer.extract.canvas({
     target: ground,
     frame: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
-    resolution: GROUND_RESOLUTION,
+    resolution,
     antialias: true,
   }) as HTMLCanvasElement;
 
@@ -79,12 +79,12 @@ async function bakeGround(ground: Container): Promise<HTMLCanvasElement> {
 
 // Ground plane textured with the flat terrain art, the soil slab under it,
 // and every tree and rock as instanced low-poly meshes.
-export async function buildTerrain(scene: Scene, renderer: WebGLRenderer): Promise<void> {
+export async function buildTerrain(scene: Scene, renderer: WebGLRenderer, quality: Quality): Promise<void> {
   const { ground, props } = buildWorldScene();
 
-  const map = new CanvasTexture(await bakeGround(ground));
+  const map = new CanvasTexture(await bakeGround(ground, quality.groundResolution));
   map.colorSpace = SRGBColorSpace;
-  map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
   const plane = new Mesh(new PlaneGeometry(WORLD_WIDTH, WORLD_HEIGHT), new MeshLambertMaterial({ map }));
   plane.rotation.x = -Math.PI / 2;
@@ -100,5 +100,5 @@ export async function buildTerrain(scene: Scene, renderer: WebGLRenderer): Promi
   slab.position.set(WORLD_WIDTH / 2, -depth / 2 - 0.2, WORLD_HEIGHT / 2);
   scene.add(slab);
 
-  addProps(scene, props);
+  addProps(scene, props, quality);
 }

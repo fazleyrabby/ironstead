@@ -20,6 +20,7 @@ import type { Camera } from "../render/Camera";
 import type { Building, BuildingType, GameState } from "../sim/types";
 import { isTileVisible } from "../sim/visibility";
 import type { VisibilityMap } from "../sim/visibility";
+import type { Quality } from "./quality";
 
 // Light radius in world units per lit building type; unlisted types cast no light.
 const BUILDING_LIGHT: Partial<Record<BuildingType, number>> = {
@@ -70,7 +71,7 @@ export class Lights3D {
   private readonly flyHomes: Float32Array;
   private readonly lit: Lit[] = [];
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, quality: Quality) {
     this.scene = scene;
     const { lighting, fireflies } = VIEW3D;
 
@@ -78,14 +79,14 @@ export class Lights3D {
 
     this.sunOffset = new Vector3(...lighting.sunFrom).normalize().multiplyScalar(2200);
     this.sun = new DirectionalLight(lighting.sun, lighting.sunIntensity);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(lighting.shadowMap, lighting.shadowMap);
+    this.sun.castShadow = quality.shadows;
+    this.sun.shadow.mapSize.set(quality.shadowMap, quality.shadowMap);
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.camera.near = 200;
     this.sun.shadow.camera.far = 5200;
     scene.add(this.sun, this.sun.target);
 
-    for (let i = 0; i < lighting.pointLights; i += 1) {
+    for (let i = 0; i < quality.pointLights; i += 1) {
       const light = new PointLight(lighting.buildingLight, 0, 1, 2);
       this.points.push(light);
       scene.add(light);
@@ -169,6 +170,11 @@ export class Lights3D {
       );
     }
     positions.needsUpdate = true;
+  }
+
+  // Runtime fallback when the device cannot hold frame rate.
+  disableShadows(): void {
+    this.sun.castShadow = false;
   }
 
   // Keeps the shadow frustum centred on, and sized to, what the camera sees.

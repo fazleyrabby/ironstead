@@ -3,6 +3,7 @@ import type { BufferGeometry, Scene } from "three";
 import { STYLE } from "../render/style";
 import type { PropInstance, PropKind } from "../render/WorldScene";
 import { blob, cone, cyl, merge, modelMaterial, rock, seeded } from "./geo";
+import type { Quality } from "./quality";
 
 // Models are built at unit size; an instance is scaled by its 2D prop size.
 const TREE_SCALE = 1.35;
@@ -79,9 +80,12 @@ function model(kind: PropKind): BufferGeometry {
 }
 
 // Every tree, rock and reed on the map as instanced low-poly meshes.
-export function addProps(scene: Scene, props: PropInstance[]): void {
+export function addProps(scene: Scene, props: PropInstance[], quality: Quality): void {
   const byKind = new Map<PropKind, PropInstance[]>();
+  const keep = seeded(77);
   for (const prop of props) {
+    // Thin out decoration on weaker devices; these props never affect play.
+    if (keep() > quality.propDensity) continue;
     const list = byKind.get(prop.kind) ?? [];
     list.push(prop);
     byKind.set(prop.kind, list);
@@ -96,8 +100,8 @@ export function addProps(scene: Scene, props: PropInstance[]): void {
 
   for (const [kind, list] of byKind) {
     const mesh = new InstancedMesh(model(kind), modelMaterial(), list.length);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = quality.shadows;
+    mesh.receiveShadow = quality.shadows;
     mesh.frustumCulled = false;
 
     const base = TREES.has(kind) ? TREE_SCALE : SMALL_SCALE;

@@ -316,6 +316,17 @@ async function main(): Promise<void> {
     onPrimaryClick: handlePrimary,
     onSecondaryClick: handleSecondary,
     onBoxSelect: handleBox,
+    // One finger has no right button: with units selected, a tap on anything
+    // but one of your own units is an order.
+    onTap: (screenX, screenY) => {
+      const ordering =
+        game.state.ui.selectedUnitIds.length > 0 &&
+        !game.state.ui.pendingBuild &&
+        !attackMovePending &&
+        !unitAtPoint(screenX, screenY);
+      if (ordering) handleSecondary(screenX, screenY);
+      else handlePrimary(screenX, screenY);
+    },
     onKeyDown: (code, event) => {
       if (!started) return;
       const mod = event.ctrlKey || event.metaKey;
@@ -416,6 +427,7 @@ async function main(): Promise<void> {
     (window as unknown as { __rts?: unknown }).__rts = {
       game,
       camera,
+      stats: () => scene.stats(),
       setSpeed: (n: number): void => {
         loop.timeScale = n;
       },

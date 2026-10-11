@@ -47,9 +47,7 @@ export const VIEW3D = {
     sunIntensity: 2.6,
     // Direction the light travels from (x, up, z); low and from the south-west.
     sunFrom: [-0.62, 0.58, 0.52],
-    shadowMap: 4096,
     buildingLight: 0xffb060,
-    pointLights: 6,
   },
 
   fireflies: 70,

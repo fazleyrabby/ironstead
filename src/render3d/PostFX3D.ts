@@ -6,6 +6,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { VIEW3D } from "../config/atmosphere";
+import type { Quality } from "./quality";
 
 // Tilt-shift blur (golden-angle disc), then saturation and vignette.
 const TiltShiftShader = {
@@ -65,26 +66,32 @@ const TiltShiftShader = {
   `,
 };
 
+// Bloom + tilt-shift chain. Only built when the quality tier asks for it;
+// otherwise the scene renders straight to the canvas.
 export class PostFX3D {
   private readonly composer: EffectComposer;
-  private readonly bloom: UnrealBloomPass;
-  private readonly tiltShift: ShaderPass;
+  private readonly tiltShift?: ShaderPass;
 
-  constructor(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera) {
+  constructor(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, quality: Quality) {
     const { bloom, tiltShift, grade } = VIEW3D;
-    const target = new WebGLRenderTarget(256, 256, { type: HalfFloatType, samples: 4 });
+    const target = new WebGLRenderTarget(256, 256, { type: HalfFloatType, samples: quality.msaa });
     this.composer = new EffectComposer(renderer, target);
     this.composer.addPass(new RenderPass(scene, camera));
 
-    this.bloom = new UnrealBloomPass(new Vector2(256, 256), bloom.strength, bloom.radius, bloom.threshold);
-    this.composer.addPass(this.bloom);
+    if (quality.bloom) {
+      this.composer.addPass(
+        new UnrealBloomPass(new Vector2(256, 256), bloom.strength, bloom.radius, bloom.threshold),
+      );
+    }
 
-    this.tiltShift = new ShaderPass(TiltShiftShader);
-    this.tiltShift.uniforms.uFocus.value = tiltShift.focus;
-    this.tiltShift.uniforms.uBand.value = tiltShift.band;
-    this.tiltShift.uniforms.uVignette.value = grade.vignette;
-    this.tiltShift.uniforms.uSaturation.value = grade.saturation;
-    this.composer.addPass(this.tiltShift);
+    if (quality.tiltShift) {
+      this.tiltShift = new ShaderPass(TiltShiftShader);
+      this.tiltShift.uniforms.uFocus.value = tiltShift.focus;
+      this.tiltShift.uniforms.uBand.value = tiltShift.band;
+      this.tiltShift.uniforms.uVignette.value = grade.vignette;
+      this.tiltShift.uniforms.uSaturation.value = grade.saturation;
+      this.composer.addPass(this.tiltShift);
+    }
 
     this.composer.addPass(new OutputPass());
   }
@@ -92,13 +99,15 @@ export class PostFX3D {
   resize(width: number, height: number, pixelRatio: number): void {
     this.composer.setPixelRatio(pixelRatio);
     this.composer.setSize(width, height);
-    this.tiltShift.uniforms.uTexel.value.set(1 / width, 1 / height);
+    this.tiltShift?.uniforms.uTexel.value.set(1 / width, 1 / height);
   }
 
   render(zoom: number): void {
-    const { tiltShift } = VIEW3D;
-    const factor = Math.min(1, Math.max(tiltShift.minZoomFactor, zoom / tiltShift.fullZoom));
-    this.tiltShift.uniforms.uBlur.value = tiltShift.maxBlur * factor;
+    if (this.tiltShift) {
+      const { tiltShift } = VIEW3D;
+      const factor = Math.min(1, Math.max(tiltShift.minZoomFactor, zoom / tiltShift.fullZoom));
+      this.tiltShift.uniforms.uBlur.value = tiltShift.maxBlur * factor;
+    }
     this.composer.render();
   }
 }

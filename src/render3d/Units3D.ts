@@ -1,5 +1,5 @@
-import { BoxGeometry, Color, ConeGeometry, CylinderGeometry, Group, IcosahedronGeometry, Mesh, MeshBasicMaterial, MeshLambertMaterial } from "three";
-import type { BufferGeometry, Material, Scene } from "three";
+import { Group, Mesh } from "three";
+import type { BufferGeometry, Scene } from "three";
 import { PALETTE, worldToTile } from "../config/world";
 import { STYLE } from "../render/style";
 import { unitDef } from "../sim/selectors";
@@ -7,56 +7,164 @@ import type { GameState, PlayerId, Unit, UnitType } from "../sim/types";
 import { isTileExplored, isTileVisible } from "../sim/visibility";
 import type { VisibilityMap } from "../sim/visibility";
 import type { Bars3D } from "./Bars3D";
+import { merge, modelMaterial, prim } from "./geo";
+import type { Quality } from "./quality";
 
 const TUNIC: Record<PlayerId, number> = { player: PALETTE.playerTint, enemy: PALETTE.enemyTint };
 const TRIM: Record<PlayerId, number> = { player: 0x1e4fae, enemy: 0xa52424 };
 
-// Shared unit-sized primitives; every body part is one of these, scaled.
-const BOX = new BoxGeometry(1, 1, 1);
-const BALL = new IcosahedronGeometry(1, 1);
-const TUBE = new CylinderGeometry(1, 1, 1, 6);
-const CONE = new ConeGeometry(1, 1, 6);
-
-const materials = new Map<number, MeshLambertMaterial>();
-function lit(color: number): MeshLambertMaterial {
-  let material = materials.get(color);
-  if (!material) {
-    material = new MeshLambertMaterial({ color, flatShading: true });
-    materials.set(color, material);
-  }
-  return material;
-}
-const GOLD_GLOW = new MeshBasicMaterial({ color: new Color(STYLE.gold).multiplyScalar(1.15) });
-
-function piece(
-  parent: Group,
-  geometry: BufferGeometry,
-  material: Material,
-  sx: number,
-  sy: number,
-  sz: number,
-  x: number,
-  y: number,
-  z: number,
-): Mesh {
-  const mesh = new Mesh(geometry, material);
-  mesh.scale.set(sx, sy, sz);
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  parent.add(mesh);
-  return mesh;
-}
-
-// A limb hangs from its pivot so rotating the pivot swings it.
-function limb(parent: Group, material: Material, w: number, length: number, x: number, y: number, z = 0): Group {
-  const pivot = new Group();
-  pivot.position.set(x, y, z);
-  piece(pivot, BOX, material, w, length, w, 0, -length / 2, 0);
-  parent.add(pivot);
-  return pivot;
-}
-
 type AttackStyle = "chop" | "thrust" | "shoot";
+type Parts = BufferGeometry[];
+
+// A limb's parts are modelled hanging down from its pivot, so rotating the
+// pivot swings the limb and whatever it holds.
+interface LimbParts {
+  parts: Parts;
+  x: number;
+  y: number;
+  z: number;
+}
+
+function limbParts(color: number, w: number, length: number, x: number, y: number, z = 0): LimbParts {
+  return { parts: [prim("box", color, w, length, w, 0, -length / 2, 0)], x, y, z };
+}
+
+interface Limb {
+  geometry: BufferGeometry;
+  x: number;
+  y: number;
+  z: number;
+}
+
+// Merged geometry for one unit type + owner, shared by every such unit: a
+// static body plus one mesh per moving limb.
+interface Blueprint {
+  body: BufferGeometry;
+  legs: Limb[];
+  armL: Limb;
+  armR: Limb;
+  attack: AttackStyle;
+  mounted: boolean;
+  scale: number;
+  height: number;
+}
+
+function humanoid(
+  body: Parts,
+  type: UnitType,
+  owner: PlayerId,
+  hipY: number,
+  z: number,
+  withLegs: boolean,
+): { legs: LimbParts[]; armL: LimbParts; armR: LimbParts } {
+  const tunic = type === "villager" ? 0xb08a5a : TUNIC[owner];
+  const trim = TRIM[owner];
+  const legs: LimbParts[] = [];
+
+  if (withLegs) {
+    for (const sx of [-1, 1]) legs.push(limbParts(STYLE.boot, 2.5, hipY, sx * 1.7, hipY, z));
+  }
+  body.push(prim("box", tunic, 7, 9.5, 4.4, 0, hipY + 4.75, z));
+  body.push(prim("box", trim, 7.3, 1.6, 4.7, 0, hipY + 1.2, z));
+  body.push(prim("ball", STYLE.skin, 3.2, 3.3, 3.2, 0, hipY + 12.6, z));
+
+  const armL = limbParts(tunic, 2.2, 8, -4.7, hipY + 9, z);
+  const armR = limbParts(tunic, 2.2, 8, 4.7, hipY + 9, z);
+  armL.parts.push(prim("ball", STYLE.skin, 1.3, 1.3, 1.3, 0, -8.2, 0));
+  armR.parts.push(prim("ball", STYLE.skin, 1.3, 1.3, 1.3, 0, -8.2, 0));
+
+  const headY = hipY + 12.6;
+  const forward = Math.PI / 2;
+  switch (type) {
+    case "villager":
+      body.push(prim("cone", 0xd9b45c, 5.2, 3, 5.2, 0, headY + 3.4, z));
+      // Pick/axe held in the working hand.
+      armR.parts.push(prim("box", STYLE.woodDark, 0.8, 9, 0.8, 0, -8, 3));
+      armR.parts.push(prim("box", STYLE.steel, 0.9, 2.4, 4.6, 0, -4.2, 4.2));
+      break;
+    case "swordsman":
+      body.push(prim("ball", STYLE.steel, 3.5, 2.6, 3.5, 0, headY + 1.5, z));
+      armR.parts.push(prim("box", STYLE.steel, 0.8, 11, 1.7, 0, -8, 5.5, forward));
+      armR.parts.push(prim("box", STYLE.goldDark, 3.4, 0.9, 0.9, 0, -8, 0.8));
+      armL.parts.push(prim("tube", trim, 4.6, 1, 4.6, -1.5, -5, 0, 0, forward));
+      armL.parts.push(prim("ball", STYLE.steel, 1.2, 1.2, 1.2, -2.2, -5, 0));
+      break;
+    case "spearman":
+      body.push(prim("cone", STYLE.steel, 3.6, 4, 3.6, 0, headY + 3, z));
+      armR.parts.push(prim("tube", STYLE.woodDark, 0.45, 26, 0.45, 0, -8, 6, forward));
+      armR.parts.push(prim("cone", STYLE.steel, 1.1, 4, 1.1, 0, -8, 20.5, forward));
+      break;
+    case "crossbowman":
+      body.push(prim("cone", STYLE.leather, 3.9, 4.6, 3.9, 0, headY + 2.6, z));
+      armR.parts.push(prim("box", STYLE.woodDark, 1.2, 1.2, 9, 0, -8, 3.5));
+      armR.parts.push(prim("box", STYLE.woodLight, 10, 0.9, 1.1, 0, -8, 7));
+      body.push(prim("tube", STYLE.leather, 1.6, 7, 1.6, -2.5, hipY + 7, z - 3));
+      break;
+    case "horse_rider":
+      body.push(prim("ball", STYLE.steel, 3.5, 2.8, 3.5, 0, headY + 1.4, z));
+      body.push(prim("cone", trim, 1, 3.4, 1, 0, headY + 5, z));
+      armR.parts.push(prim("tube", STYLE.woodDark, 0.5, 32, 0.5, 0, -8, 9, forward));
+      armR.parts.push(prim("cone", STYLE.steel, 1.3, 5, 1.3, 0, -8, 27, forward));
+      break;
+    case "hero":
+      body.push(prim("tube", STYLE.gold, 3.1, 1.9, 3.1, 0, headY + 3.5, z));
+      body.push(prim("box", trim, 8.4, 13, 0.9, 0, hipY + 4, z - 2.9));
+      body.push(prim("box", STYLE.gold, 7.6, 1.5, 4.9, 0, hipY + 8.6, z));
+      armR.parts.push(prim("box", STYLE.steel, 1, 14, 2.1, 0, -8, 7, forward));
+      armR.parts.push(prim("box", STYLE.gold, 4.2, 1, 1, 0, -8, 0.8));
+      break;
+  }
+  return { legs, armL, armR };
+}
+
+function finish(limb: LimbParts): Limb {
+  return { geometry: merge(limb.parts), x: limb.x, y: limb.y, z: limb.z };
+}
+
+function blueprint(type: UnitType, owner: PlayerId): Blueprint {
+  const body: Parts = [];
+  const s = unitDef(type).radius / 10;
+
+  if (type === "horse_rider") {
+    body.push(prim("box", STYLE.horse, 6.5, 7, 17, 0, 12.5, 0));
+    body.push(prim("box", STYLE.horse, 3.4, 9, 4.4, 0, 18, 8.2, 0.55));
+    body.push(prim("box", STYLE.horse, 3.2, 3.6, 7, 0, 22.5, 12));
+    body.push(prim("box", STYLE.horseDark, 1, 6, 1.4, 0, 20, 6.6));
+    body.push(prim("box", STYLE.horseDark, 1.4, 8, 1.4, 0, 12, -9.2, -0.35));
+    body.push(prim("box", TRIM[owner], 7, 1.2, 8, 0, 16.4, -0.5));
+    for (const sx of [-1, 1]) body.push(prim("box", STYLE.boot, 2.2, 7, 2.6, sx * 3.9, 17, 0.1));
+    const legs = [
+      limbParts(STYLE.horseDark, 2, 9.5, -2.2, 9.5, 6.4),
+      limbParts(STYLE.horseDark, 2, 9.5, 2.2, 9.5, 6.4),
+      limbParts(STYLE.horseDark, 2, 9.5, -2.2, 9.5, -6.4),
+      limbParts(STYLE.horseDark, 2, 9.5, 2.2, 9.5, -6.4),
+    ];
+    const rider = humanoid(body, type, owner, 16.6, -0.5, false);
+    return {
+      body: merge(body),
+      legs: legs.map(finish),
+      armL: finish(rider.armL),
+      armR: finish(rider.armR),
+      attack: "thrust",
+      mounted: true,
+      scale: s,
+      height: 36 * s,
+    };
+  }
+
+  const parts = humanoid(body, type, owner, 8, 0, true);
+  const scale = s * 1.12 * (type === "hero" ? 1.18 : 1);
+  return {
+    body: merge(body),
+    legs: parts.legs.map(finish),
+    armL: finish(parts.armL),
+    armR: finish(parts.armR),
+    attack: type === "crossbowman" ? "shoot" : type === "spearman" ? "thrust" : "chop",
+    mounted: false,
+    scale,
+    height: 27 * scale,
+  };
+}
 
 interface Rig {
   // Rotated to face travel; model front is +z.
@@ -69,105 +177,6 @@ interface Rig {
   attack: AttackStyle;
   mounted: boolean;
   height: number;
-}
-
-function humanoid(body: Group, type: UnitType, owner: PlayerId, hipY: number, withLegs: boolean): Pick<Rig, "legs" | "armL" | "armR"> {
-  const tunic = lit(type === "villager" ? 0xb08a5a : TUNIC[owner]);
-  const trim = lit(TRIM[owner]);
-  const skin = lit(STYLE.skin);
-  const steel = lit(STYLE.steel);
-  const legs: Group[] = [];
-
-  if (withLegs) {
-    for (const sx of [-1, 1]) legs.push(limb(body, lit(STYLE.boot), 2.5, hipY, sx * 1.7, hipY));
-  }
-  piece(body, BOX, tunic, 7, 9.5, 4.4, 0, hipY + 4.75, 0);
-  piece(body, BOX, trim, 7.3, 1.6, 4.7, 0, hipY + 1.2, 0);
-  piece(body, BALL, skin, 3.2, 3.3, 3.2, 0, hipY + 12.6, 0);
-
-  const armL = limb(body, tunic, 2.2, 8, -4.7, hipY + 9);
-  const armR = limb(body, tunic, 2.2, 8, 4.7, hipY + 9);
-  piece(armL, BALL, skin, 1.3, 1.3, 1.3, 0, -8.2, 0);
-  piece(armR, BALL, skin, 1.3, 1.3, 1.3, 0, -8.2, 0);
-
-  const headY = hipY + 12.6;
-  switch (type) {
-    case "villager":
-      piece(body, CONE, lit(0xd9b45c), 5.2, 3, 5.2, 0, headY + 3.4, 0);
-      // Pick/axe held in the working hand.
-      piece(armR, BOX, lit(STYLE.woodDark), 0.8, 9, 0.8, 0, -8, 3);
-      piece(armR, BOX, steel, 0.9, 2.4, 4.6, 0, -4.2, 4.2);
-      break;
-    case "swordsman":
-      piece(body, BALL, steel, 3.5, 2.6, 3.5, 0, headY + 1.5, 0);
-      piece(armR, BOX, steel, 0.8, 11, 1.7, 0, -8, 5.5).rotation.x = Math.PI / 2;
-      piece(armR, BOX, lit(STYLE.goldDark), 3.4, 0.9, 0.9, 0, -8, 0.8);
-      piece(armL, TUBE, trim, 4.6, 1, 4.6, -1.5, -5, 0).rotation.z = Math.PI / 2;
-      piece(armL, BALL, steel, 1.2, 1.2, 1.2, -2.2, -5, 0);
-      break;
-    case "spearman":
-      piece(body, CONE, steel, 3.6, 4, 3.6, 0, headY + 3, 0);
-      piece(armR, TUBE, lit(STYLE.woodDark), 0.45, 26, 0.45, 0, -8, 6).rotation.x = Math.PI / 2;
-      piece(armR, CONE, steel, 1.1, 4, 1.1, 0, -8, 20.5).rotation.x = Math.PI / 2;
-      break;
-    case "crossbowman":
-      piece(body, CONE, lit(STYLE.leather), 3.9, 4.6, 3.9, 0, headY + 2.6, 0);
-      piece(armR, BOX, lit(STYLE.woodDark), 1.2, 1.2, 9, 0, -8, 3.5);
-      piece(armR, BOX, lit(STYLE.woodLight), 10, 0.9, 1.1, 0, -8, 7);
-      piece(body, TUBE, lit(STYLE.leather), 1.6, 7, 1.6, -2.5, hipY + 7, -3);
-      break;
-    case "horse_rider":
-      piece(body, BALL, steel, 3.5, 2.8, 3.5, 0, headY + 1.4, 0);
-      piece(body, CONE, trim, 1, 3.4, 1, 0, headY + 5, 0);
-      piece(armR, TUBE, lit(STYLE.woodDark), 0.5, 32, 0.5, 0, -8, 9).rotation.x = Math.PI / 2;
-      piece(armR, CONE, steel, 1.3, 5, 1.3, 0, -8, 27).rotation.x = Math.PI / 2;
-      break;
-    case "hero":
-      piece(body, TUBE, GOLD_GLOW, 3.1, 1.9, 3.1, 0, headY + 3.5, 0).castShadow = false;
-      piece(body, BOX, trim, 8.4, 13, 0.9, 0, hipY + 4, -2.9);
-      piece(body, BOX, lit(STYLE.gold), 7.6, 1.5, 4.9, 0, hipY + 8.6, 0);
-      piece(armR, BOX, steel, 1, 14, 2.1, 0, -8, 7).rotation.x = Math.PI / 2;
-      piece(armR, BOX, lit(STYLE.gold), 4.2, 1, 1, 0, -8, 0.8);
-      break;
-  }
-  return { legs, armL, armR };
-}
-
-function buildRig(unit: Unit): Rig {
-  const root = new Group();
-  const body = new Group();
-  root.add(body);
-  const s = unitDef(unit.type).radius / 10;
-
-  if (unit.type === "horse_rider") {
-    const coat = lit(STYLE.horse);
-    const dark = lit(STYLE.horseDark);
-    piece(body, BOX, coat, 6.5, 7, 17, 0, 12.5, 0);
-    piece(body, BOX, coat, 3.4, 9, 4.4, 0, 18, 8.2).rotation.x = 0.55;
-    piece(body, BOX, coat, 3.2, 3.6, 7, 0, 22.5, 12);
-    piece(body, BOX, dark, 1, 6, 1.4, 0, 20, 6.6);
-    piece(body, BOX, dark, 1.4, 8, 1.4, 0, 12, -9.2).rotation.x = -0.35;
-    piece(body, BOX, lit(TRIM[unit.owner]), 7, 1.2, 8, 0, 16.4, -0.5);
-    const legs = [
-      limb(body, dark, 2, 9.5, -2.2, 9.5, 6.4),
-      limb(body, dark, 2, 9.5, 2.2, 9.5, 6.4),
-      limb(body, dark, 2, 9.5, -2.2, 9.5, -6.4),
-      limb(body, dark, 2, 9.5, 2.2, 9.5, -6.4),
-    ];
-    const rider = new Group();
-    rider.position.set(0, 0, -0.5);
-    body.add(rider);
-    const upper = humanoid(rider, unit.type, unit.owner, 16.6, false);
-    for (const sx of [-1, 1]) piece(rider, BOX, lit(STYLE.boot), 2.2, 7, 2.6, sx * 3.9, 13.5, 0.6);
-    root.scale.setScalar(s);
-    return { root, body, legs, armL: upper.armL, armR: upper.armR, attack: "thrust", mounted: true, height: 36 * s };
-  }
-
-  const parts = humanoid(body, unit.type, unit.owner, 8, true);
-  const big = unit.type === "hero" ? 1.18 : 1;
-  root.scale.setScalar(s * 1.12 * big);
-  const attack: AttackStyle = unit.type === "crossbowman" ? "shoot" : unit.type === "spearman" ? "thrust" : "chop";
-  return { root, body, ...parts, attack, mounted: false, height: 27 * s * 1.12 * big };
 }
 
 interface Entry {
@@ -186,10 +195,54 @@ export class Units3D {
   private readonly scene: Scene;
   private readonly bars: Bars3D;
   private readonly entries = new Map<string, Entry>();
+  private readonly blueprints = new Map<string, Blueprint>();
+  private readonly shadows: boolean;
 
-  constructor(scene: Scene, bars: Bars3D) {
+  constructor(scene: Scene, bars: Bars3D, quality: Quality) {
     this.scene = scene;
     this.bars = bars;
+    this.shadows = quality.unitShadows;
+  }
+
+  // Five meshes per foot unit (body, two legs, two arms), all sharing one
+  // material and per-type geometry.
+  private buildRig(unit: Unit): Rig {
+    const key = `${unit.type}_${unit.owner}`;
+    let print = this.blueprints.get(key);
+    if (!print) {
+      print = blueprint(unit.type, unit.owner);
+      this.blueprints.set(key, print);
+    }
+
+    const root = new Group();
+    const body = new Group();
+    root.add(body);
+    root.scale.setScalar(print.scale);
+
+    const add = (parent: Group, geometry: BufferGeometry): void => {
+      const mesh = new Mesh(geometry, modelMaterial());
+      mesh.castShadow = this.shadows;
+      parent.add(mesh);
+    };
+    const hang = (limb: Limb): Group => {
+      const pivot = new Group();
+      pivot.position.set(limb.x, limb.y, limb.z);
+      add(pivot, limb.geometry);
+      body.add(pivot);
+      return pivot;
+    };
+
+    add(body, print.body);
+    return {
+      root,
+      body,
+      legs: print.legs.map(hang),
+      armL: hang(print.armL),
+      armR: hang(print.armR),
+      attack: print.attack,
+      mounted: print.mounted,
+      height: print.height,
+    };
   }
 
   update(state: GameState, visibility: VisibilityMap, nowSec: number, frameDt: number): void {
@@ -222,7 +275,7 @@ export class Units3D {
         seen.add(unit.id);
 
         if (!entry) {
-          const rig = buildRig(unit);
+          const rig = this.buildRig(unit);
           this.scene.add(rig.root);
           entry = {
             rig,

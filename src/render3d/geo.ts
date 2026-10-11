@@ -89,6 +89,32 @@ export function gable(
   return paint(prism, color).translate(x, y, z);
 }
 
+const PRIMS = {
+  box: () => new BoxGeometry(1, 1, 1),
+  ball: () => new IcosahedronGeometry(1, 1),
+  tube: () => new CylinderGeometry(1, 1, 1, 6),
+  cone: () => new ConeGeometry(1, 1, 6),
+};
+
+// Unit primitive centred on the origin, then scaled, tilted about X and moved.
+export function prim(
+  kind: keyof typeof PRIMS,
+  color: number,
+  sx: number,
+  sy: number,
+  sz: number,
+  x: number,
+  y: number,
+  z: number,
+  tiltX = 0,
+  tiltZ = 0,
+): BufferGeometry {
+  const geometry = paint(PRIMS[kind](), color).scale(sx, sy, sz);
+  if (tiltX !== 0) geometry.rotateX(tiltX);
+  if (tiltZ !== 0) geometry.rotateZ(tiltZ);
+  return geometry.translate(x, y, z);
+}
+
 export function merge(parts: BufferGeometry[]): BufferGeometry {
   const merged = mergeGeometries(parts, false);
   if (!merged) throw new Error("Failed to merge model parts");

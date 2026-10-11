@@ -5,7 +5,14 @@ export interface InputCallbacks {
   onSecondaryClick?: (screenX: number, screenY: number) => void;
   onBoxSelect?: (x0: number, y0: number, x1: number, y1: number) => void;
   onKeyDown?: (code: string, event: KeyboardEvent) => void;
+  // Touch tap; falls back to onPrimaryClick when not provided.
+  onTap?: (screenX: number, screenY: number) => void;
 }
+
+// Touch: tap = select/order, drag = pan, pinch = zoom, long-press then drag =
+// box select, long-press and release = secondary (right-click) action.
+const LONG_PRESS_MS = 380;
+const TOUCH_SLOP = 10;
 
 export interface DragBox {
   x0: number;
@@ -31,6 +38,13 @@ export class InputManager {
   private downY = 0;
   private moved = false;
 
+  private readonly touches = new Map<number, { x: number; y: number }>();
+  private touchMode: "idle" | "pending" | "pan" | "pinch" | "held" | "box" = "idle";
+  private touchStartX = 0;
+  private touchStartY = 0;
+  private pinchDistance = 0;
+  private longPressTimer = 0;
+
   constructor(canvas: HTMLCanvasElement, camera: Camera, callbacks: InputCallbacks = {}) {
     this.canvas = canvas;
     this.camera = camera;
@@ -44,8 +58,126 @@ export class InputManager {
     canvas.addEventListener("pointerleave", this.onPointerLeave);
     window.addEventListener("pointermove", this.onPointerMove);
     window.addEventListener("pointerup", this.onPointerUp);
+    window.addEventListener("pointercancel", this.onPointerCancel);
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    canvas.style.touchAction = "none";
   }
+
+  private local(event: PointerEvent): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  private pinchState(): { x: number; y: number; distance: number } {
+    const [a, b] = [...this.touches.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, distance: Math.hypot(a.x - b.x, a.y - b.y) };
+  }
+
+  private touchDown(event: PointerEvent): void {
+    const point = this.local(event);
+    this.touches.set(event.pointerId, point);
+    window.clearTimeout(this.longPressTimer);
+    if (this.touchMode === "pan") this.camera.endDrag();
+
+    if (this.touches.size === 1) {
+      this.touchMode = "pending";
+      this.touchStartX = point.x;
+      this.touchStartY = point.y;
+      this.pointer.x = point.x;
+      this.pointer.y = point.y;
+      this.pointer.inside = true;
+      this.longPressTimer = window.setTimeout(() => {
+        if (this.touchMode !== "pending") return;
+        this.touchMode = "held";
+        navigator.vibrate?.(12);
+      }, LONG_PRESS_MS);
+      return;
+    }
+
+    if (this.touches.size === 2) {
+      const pinch = this.pinchState();
+      this.touchMode = "pinch";
+      this.dragBox.active = false;
+      this.pinchDistance = pinch.distance;
+      this.camera.beginDrag(pinch.x, pinch.y);
+    }
+  }
+
+  private touchMove(event: PointerEvent): void {
+    const point = this.local(event);
+    this.touches.set(event.pointerId, point);
+
+    if (this.touchMode === "pinch" && this.touches.size >= 2) {
+      const pinch = this.pinchState();
+      if (this.pinchDistance > 0 && pinch.distance > 0) {
+        // Same exponential mapping the wheel uses, so pinch tracks the fingers.
+        this.camera.zoomAt(pinch.x, pinch.y, -Math.log(pinch.distance / this.pinchDistance) / 0.0012);
+      }
+      this.pinchDistance = pinch.distance;
+      this.camera.moveDrag(pinch.x, pinch.y);
+      return;
+    }
+
+    this.pointer.x = point.x;
+    this.pointer.y = point.y;
+    const travelled = Math.hypot(point.x - this.touchStartX, point.y - this.touchStartY);
+
+    if (this.touchMode === "pending" && travelled > TOUCH_SLOP) {
+      window.clearTimeout(this.longPressTimer);
+      this.touchMode = "pan";
+      this.camera.beginDrag(this.touchStartX, this.touchStartY);
+    }
+    if (this.touchMode === "held" && travelled > TOUCH_SLOP) {
+      this.touchMode = "box";
+      this.dragBox.x0 = this.touchStartX;
+      this.dragBox.y0 = this.touchStartY;
+    }
+
+    if (this.touchMode === "pan") this.camera.moveDrag(point.x, point.y);
+    if (this.touchMode === "box") {
+      this.dragBox.x1 = point.x;
+      this.dragBox.y1 = point.y;
+      this.dragBox.active = true;
+    }
+  }
+
+  private touchUp(event: PointerEvent, cancelled: boolean): void {
+    if (!this.touches.delete(event.pointerId)) return;
+    window.clearTimeout(this.longPressTimer);
+    const mode = this.touchMode;
+
+    if (mode === "pinch") {
+      this.camera.endDrag();
+      // Stay inert until every finger lifts so a pinch never ends in a tap.
+      this.touchMode = this.touches.size === 0 ? "idle" : "pinch";
+      if (this.touches.size === 1) this.pinchDistance = 0;
+      return;
+    }
+
+    this.touchMode = "idle";
+    this.pointer.inside = false;
+    if (mode === "pan") this.camera.endDrag();
+    if (cancelled) {
+      this.dragBox.active = false;
+      return;
+    }
+
+    const point = this.local(event);
+    if (mode === "pending") {
+      if (this.callbacks.onTap) this.callbacks.onTap(point.x, point.y);
+      else this.callbacks.onPrimaryClick?.(point.x, point.y);
+    } else if (mode === "held") {
+      this.callbacks.onSecondaryClick?.(point.x, point.y);
+    } else if (mode === "box") {
+      const box = { ...this.dragBox };
+      this.dragBox.active = false;
+      this.callbacks.onBoxSelect?.(box.x0, box.y0, box.x1, box.y1);
+    }
+  }
+
+  private readonly onPointerCancel = (event: PointerEvent): void => {
+    if (event.pointerType === "touch") this.touchUp(event, true);
+  };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (!this.keys.has(event.code)) {
@@ -66,15 +198,19 @@ export class InputManager {
     this.camera.zoomAt(event.clientX - rect.left, event.clientY - rect.top, event.deltaY);
   };
 
-  private readonly onPointerEnter = (): void => {
-    this.pointer.inside = true;
+  private readonly onPointerEnter = (event: PointerEvent): void => {
+    if (event.pointerType !== "touch") this.pointer.inside = true;
   };
 
-  private readonly onPointerLeave = (): void => {
-    this.pointer.inside = false;
+  private readonly onPointerLeave = (event: PointerEvent): void => {
+    if (event.pointerType !== "touch") this.pointer.inside = false;
   };
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    if (event.pointerType === "touch") {
+      this.touchDown(event);
+      return;
+    }
     const isPan = event.button === 1;
     if (isPan) {
       event.preventDefault();
@@ -102,6 +238,10 @@ export class InputManager {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === "touch") {
+      if (this.touches.has(event.pointerId)) this.touchMove(event);
+      return;
+    }
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.x = event.clientX - rect.left;
     this.pointer.y = event.clientY - rect.top;
@@ -126,6 +266,10 @@ export class InputManager {
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
+    if (event.pointerType === "touch") {
+      this.touchUp(event, false);
+      return;
+    }
     if (this.panning && event.button === this.panButton) {
       this.panning = false;
       this.panButton = -1;
