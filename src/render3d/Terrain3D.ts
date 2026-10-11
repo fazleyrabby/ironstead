@@ -1,31 +1,21 @@
-import { Graphics, Rectangle } from "pixi.js";
+import { Application, Rectangle } from "pixi.js";
+import type { Container } from "pixi.js";
 import {
   BoxGeometry,
   CanvasTexture,
-  InstancedMesh,
-  Matrix4,
   Mesh,
   MeshLambertMaterial,
   PlaneGeometry,
-  Quaternion,
   RepeatWrapping,
   SRGBColorSpace,
-  Vector3,
 } from "three";
 import type { Scene, WebGLRenderer } from "three";
 import { VIEW3D } from "../config/atmosphere";
 import { WORLD_HEIGHT, WORLD_WIDTH } from "../config/world";
-import { buildWorldScene, drawProp } from "../render/WorldScene";
-import type { PropInstance, PropKind } from "../render/WorldScene";
-import type { Atlas } from "./Atlas";
-import { billboardMaterials } from "./QuadBatch";
+import { buildWorldScene } from "../render/WorldScene";
+import { addProps } from "./Props3D";
 
 const GROUND_RESOLUTION = 1.5;
-// Props are baked once at this nominal size and scaled per instance.
-const PROP_BAKE_SIZE = 16;
-const PROP_BAKE_RESOLUTION = 6;
-const TREES: ReadonlySet<PropKind> = new Set<PropKind>(["round", "round_autumn", "pine", "birch", "dead"]);
-
 function strataTexture(): CanvasTexture {
   const width = 512;
   const height = 128;
@@ -66,72 +56,35 @@ function strataTexture(): CanvasTexture {
   return texture;
 }
 
-function addProps(scene: Scene, bakery: Atlas, props: PropInstance[]): void {
-  const { stretch, treeScale, propScale } = VIEW3D.billboard;
-  const byKind = new Map<PropKind, PropInstance[]>();
-  for (const prop of props) {
-    const list = byKind.get(prop.kind) ?? [];
-    list.push(prop);
-    byKind.set(prop.kind, list);
-  }
+// The flat terrain art (grass, road, ponds, flowers) is still drawn with Pixi
+// Graphics; it is rendered once here and copied into a plain 2D canvas.
+async function bakeGround(ground: Container): Promise<HTMLCanvasElement> {
+  const app = new Application();
+  await app.init({ width: 8, height: 8, preference: "webgl", autoStart: false, antialias: true });
+  const baked = app.renderer.extract.canvas({
+    target: ground,
+    frame: new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT),
+    resolution: GROUND_RESOLUTION,
+    antialias: true,
+  }) as HTMLCanvasElement;
 
-  const matrix = new Matrix4();
-  const position = new Vector3();
-  const scale = new Vector3();
-  const upright = new Quaternion();
-
-  for (const [kind, list] of byKind) {
-    const art = new Graphics();
-    drawProp(art, kind, PROP_BAKE_SIZE);
-    const bounds = art.getLocalBounds();
-    const frame = new Rectangle(
-      Math.floor(bounds.x) - 2,
-      Math.floor(bounds.y) - 2,
-      Math.ceil(bounds.width) + 4,
-      Math.ceil(bounds.height) + 4,
-    );
-    const texture = new CanvasTexture(bakery.bake(art, frame, PROP_BAKE_RESOLUTION));
-    texture.colorSpace = SRGBColorSpace;
-    texture.anisotropy = 4;
-    art.destroy();
-
-    const geometry = new PlaneGeometry(1, 1);
-    geometry.translate(0, 0.5, 0);
-    const normals = geometry.attributes.normal;
-    for (let i = 0; i < normals.count; i += 1) normals.setXYZ(i, 0, 1, 0);
-
-    const { material, depth } = billboardMaterials(texture);
-    const mesh = new InstancedMesh(geometry, material, list.length);
-    mesh.customDepthMaterial = depth;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-
-    const boost = TREES.has(kind) ? treeScale : propScale;
-    const centreX = frame.x + frame.width / 2;
-    const baseY = frame.y + frame.height;
-    list.forEach((prop, i) => {
-      const unit = prop.size / PROP_BAKE_SIZE;
-      const s = unit * boost;
-      position.set(prop.x + centreX * s, 0, prop.y + baseY * unit);
-      scale.set(frame.width * s, frame.height * s * stretch, 1);
-      mesh.setMatrixAt(i, matrix.compose(position, upright, scale));
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    scene.add(mesh);
-  }
+  const canvas = document.createElement("canvas");
+  canvas.width = baked.width;
+  canvas.height = baked.height;
+  canvas.getContext("2d")?.drawImage(baked, 0, 0);
+  ground.destroy({ children: true });
+  app.destroy(true);
+  return canvas;
 }
 
-// Ground plane textured with the flat 2D terrain art, the soil slab under it,
-// and every standing prop as an instanced billboard.
-export function buildTerrain(scene: Scene, renderer: WebGLRenderer, bakery: Atlas): void {
+// Ground plane textured with the flat terrain art, the soil slab under it,
+// and every tree and rock as instanced low-poly meshes.
+export async function buildTerrain(scene: Scene, renderer: WebGLRenderer): Promise<void> {
   const { ground, props } = buildWorldScene();
 
-  const canvas = bakery.bake(ground, new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT), GROUND_RESOLUTION);
-  const map = new CanvasTexture(canvas);
+  const map = new CanvasTexture(await bakeGround(ground));
   map.colorSpace = SRGBColorSpace;
   map.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  ground.destroy({ children: true });
 
   const plane = new Mesh(new PlaneGeometry(WORLD_WIDTH, WORLD_HEIGHT), new MeshLambertMaterial({ map }));
   plane.rotation.x = -Math.PI / 2;
@@ -147,5 +100,5 @@ export function buildTerrain(scene: Scene, renderer: WebGLRenderer, bakery: Atla
   slab.position.set(WORLD_WIDTH / 2, -depth / 2 - 0.2, WORLD_HEIGHT / 2);
   scene.add(slab);
 
-  addProps(scene, bakery, props);
+  addProps(scene, props);
 }

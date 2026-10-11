@@ -5,35 +5,34 @@ import { Camera } from "../render/Camera";
 import type { PlacementResult } from "../sim/placement";
 import type { GameState } from "../sim/types";
 import type { VisibilityMap } from "../sim/visibility";
-import { Buildings3D, Units3D } from "./Entities3D";
+import { Bars3D } from "./Bars3D";
+import { Buildings3D } from "./Buildings3D";
 import { Fog3D } from "./Fog3D";
 import { Lights3D } from "./Lights3D";
 import { Overlays3D } from "./Overlays3D";
 import { PostFX3D } from "./PostFX3D";
 import { buildTerrain } from "./Terrain3D";
+import { Units3D } from "./Units3D";
 
-// Owns the Three.js scene: terrain, sprite billboards, lighting and post-FX.
+// Owns the Three.js scene: terrain, low-poly models, lighting and post-FX.
 export class Scene3D {
   readonly canvas: HTMLCanvasElement;
   readonly camera = new Camera();
 
   private readonly renderer: WebGLRenderer;
-  private readonly scene: Scene;
+  private readonly scene = new Scene();
   private readonly haze: Fog;
   private readonly post: PostFX3D;
   private readonly fog: Fog3D;
   private readonly lights: Lights3D;
   private readonly overlays: Overlays3D;
+  private readonly bars: Bars3D;
   private readonly units: Units3D;
   private readonly buildings: Buildings3D;
   private width = 0;
   private height = 0;
 
-  private constructor(units: Units3D, buildings: Buildings3D, scene: Scene) {
-    this.scene = scene;
-    this.units = units;
-    this.buildings = buildings;
-
+  private constructor() {
     this.renderer = new WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFSoftShadowMap;
@@ -44,7 +43,9 @@ export class Scene3D {
     this.haze = new Fog(haze, 1000, 5000);
     this.scene.fog = this.haze;
 
-    buildTerrain(this.scene, this.renderer, buildings.bakery);
+    this.bars = new Bars3D(this.scene);
+    this.buildings = new Buildings3D(this.scene, this.bars);
+    this.units = new Units3D(this.scene, this.bars);
     this.lights = new Lights3D(this.scene);
     this.overlays = new Overlays3D(this.scene);
     this.fog = new Fog3D(this.scene, GRID_COLS, GRID_ROWS);
@@ -52,10 +53,9 @@ export class Scene3D {
   }
 
   static async create(): Promise<Scene3D> {
-    const scene = new Scene();
-    const buildings = await Buildings3D.create(scene);
-    const units = await Units3D.create(scene);
-    return new Scene3D(units, buildings, scene);
+    const scene = new Scene3D();
+    await buildTerrain(scene.scene, scene.renderer);
+    return scene;
   }
 
   resize(width: number, height: number): void {
@@ -82,8 +82,10 @@ export class Scene3D {
       this.resize(window.innerWidth, window.innerHeight);
     }
 
-    this.buildings.update(state, state.ui.selectedBuildingId, visibility);
-    this.units.update(state, state.ui.selectedUnitIds, visibility, nowSec, frameDt);
+    this.bars.begin();
+    this.buildings.update(state, visibility);
+    this.units.update(state, visibility, nowSec, frameDt);
+    this.bars.end();
     this.overlays.update(state, placement);
     this.lights.update(state, visibility, this.camera, nowSec);
     this.fog.update(visibility);

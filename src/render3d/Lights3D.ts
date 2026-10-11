@@ -138,7 +138,7 @@ export class Lights3D {
       const flicker = 1 + 0.05 * Math.sin(time * 6.3 + building.x * 0.37 + building.y * 0.11);
       const halo = this.halo(i);
       halo.visible = true;
-      halo.position.set(building.x, building.height * 0.55, building.y + building.height * 0.34);
+      halo.position.set(building.x, 20, building.y + building.height * 0.4);
       halo.scale.setScalar(radius * 0.8 * flicker);
     });
     for (let i = this.lit.length; i < this.halos.length; i += 1) this.halos[i].visible = false;
@@ -153,7 +153,7 @@ export class Lights3D {
       }
       const { building, radius } = entry;
       const flicker = 1 + 0.06 * Math.sin(time * 6.3 + building.x * 0.37 + building.y * 0.11);
-      light.position.set(building.x, 46, building.y + building.height * 0.75);
+      light.position.set(building.x, 40, building.y + building.height * 0.72);
       light.distance = radius * 1.9;
       light.intensity = radius * radius * 0.2 * flicker;
     });

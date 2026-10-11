@@ -7,7 +7,6 @@ import {
   groundShadow,
   inkCircle,
   inkEllipse,
-  inkPoly,
   inkRect,
 } from "./style";
 
@@ -38,17 +37,6 @@ function inPond(x: number, y: number, margin: number): boolean {
   return false;
 }
 
-function blobPoints(cx: number, cy: number, r: number, bumps: number): number[] {
-  const points: number[] = [];
-  const n = bumps * 4;
-  for (let i = 0; i < n; i += 1) {
-    const a = (i / n) * Math.PI * 2;
-    const rr = r * (0.84 + 0.16 * Math.abs(Math.sin((i * Math.PI) / 2)));
-    points.push(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.92);
-  }
-  return points;
-}
-
 export type PropKind =
   | "round"
   | "round_autumn"
@@ -70,38 +58,8 @@ export interface PropInstance {
   size: number;
 }
 
-// Draws one standing prop at the origin; the 3D renderer bakes these to billboards.
-export function drawProp(g: Graphics, kind: PropKind, size: number): void {
-  switch (kind) {
-    case "round":
-      return drawRoundTree(g, 0, 0, size, false);
-    case "round_autumn":
-      return drawRoundTree(g, 0, 0, size, true);
-    case "pine":
-      return drawPine(g, 0, 0, size);
-    case "birch":
-      return drawBirchTree(g, 0, 0, size);
-    case "dead":
-      return drawDeadTree(g, 0, 0, size);
-    case "bush":
-      return drawBush(g, 0, 0, size);
-    case "rock":
-      return drawRock(g, 0, 0, size);
-    case "boulder":
-      return drawBoulder(g, 0, 0, size);
-    case "stump":
-      return drawStump(g, 0, 0, size);
-    case "mushroom":
-      return drawMushroom(g, 0, 0, size);
-    case "tall_grass":
-      return drawTallGrass(g, 0, 0, size);
-    case "reed":
-      return drawReed(g, 0, 0, size);
-  }
-}
-
 // Flat ground art plus the list of standing props (trees, rocks, reeds) that
-// the 3D renderer places as upright billboards.
+// the 3D renderer places as meshes.
 export function buildWorldScene(): { ground: Container; props: PropInstance[] } {
   const rand = mulberry32(1337);
   const props: PropInstance[] = [];
@@ -382,143 +340,11 @@ function drawCropPlot(g: Graphics, x: number, y: number, size: number, rand: () 
   void rand;
 }
 
-function drawRoundTree(g: Graphics, x: number, y: number, size: number, autumn: boolean): void {
-  inkRect(g, x - size * 0.1, y - size * 0.12, size * 0.2, size * 0.56, STYLE.woodDark, size * 0.05, 1.6);
-  const leaf = autumn ? STYLE.autumn : STYLE.leaf;
-  const leafLight = autumn ? STYLE.autumnLight : STYLE.leafLight;
-  inkPoly(g, blobPoints(x, y - size * 0.5, size * 0.62, 5), leaf, 2);
-  g.ellipse(x - size * 0.2, y - size * 0.72, size * 0.22, size * 0.14).fill({
-    color: leafLight,
-    alpha: 0.85,
-  });
-  g.ellipse(x + size * 0.24, y - size * 0.38, size * 0.18, size * 0.1).fill({
-    color: autumn ? STYLE.autumnDark : STYLE.leafDark,
-    alpha: 0.52,
-  });
-}
-
-function drawPine(g: Graphics, x: number, y: number, size: number): void {
-  inkRect(g, x - size * 0.1, y, size * 0.2, size * 0.5, STYLE.woodDark, 0, 1.5);
-  const shades = [STYLE.leafDark, STYLE.leaf, STYLE.leafLight];
-  for (let i = 0; i < 3; i += 1) {
-    const ly = y - size * 0.3 - i * size * 0.3;
-    const lw = size * (1.1 - i * 0.28);
-    inkPoly(g, [x - lw / 2, ly, x + lw / 2, ly, x, ly - size * 0.6], shades[i], 1.8);
-    g.moveTo(x - lw * 0.24, ly - size * 0.13)
-      .lineTo(x - lw * 0.08, ly - size * 0.23)
-      .stroke({ width: 1, color: STYLE.leafLight, alpha: 0.45 });
-  }
-}
-
-function drawBush(g: Graphics, x: number, y: number, size: number): void {
-  inkPoly(g, blobPoints(x, y, size * 0.6, 4), STYLE.leaf, 1.8);
-  g.ellipse(x - size * 0.18, y - size * 0.22, size * 0.22, size * 0.13).fill({
-    color: STYLE.leafLight,
-    alpha: 0.75,
-  });
-  g.circle(x + size * 0.2, y + size * 0.05, size * 0.055).fill({ color: STYLE.flowerPink, alpha: 0.8 });
-}
-
-function drawRock(g: Graphics, x: number, y: number, size: number): void {
-  inkPoly(
-    g,
-    [x - size * 0.72, y + size * 0.4, x - size * 0.32, y - size * 0.62, x + size * 0.42, y - size * 0.5, x + size * 0.8, y + size * 0.4],
-    STYLE.stone,
-    1.8,
-  );
-  g.poly([x - size * 0.32, y - size * 0.62, x + size * 0.42, y - size * 0.5, x + size * 0.1, y - size * 0.08, x - size * 0.2, y - size * 0.12]).fill(
-    STYLE.stoneLight,
-  );
-  g.moveTo(x + size * 0.13, y - size * 0.05)
-    .lineTo(x + size * 0.27, y + size * 0.19)
-    .stroke({ width: 1, color: STYLE.stoneDark, alpha: 0.55 });
-}
-
-function drawStump(g: Graphics, x: number, y: number, size: number): void {
-  inkEllipse(g, x, y + size * 0.12, size * 0.42, size * 0.28, STYLE.woodDark, 1.6);
-  inkEllipse(g, x, y - size * 0.16, size * 0.42, size * 0.28, STYLE.woodLight, 1.6);
-  g.ellipse(x, y - size * 0.16, size * 0.2, size * 0.12).stroke({
-    width: 1.2,
-    color: STYLE.woodDark,
-    alpha: 0.7,
-  });
-  g.ellipse(x, y - size * 0.16, size * 0.31, size * 0.19).stroke({
-    width: 1,
-    color: STYLE.woodDark,
-    alpha: 0.5,
-  });
-}
-
-function drawMushroom(g: Graphics, x: number, y: number, size: number): void {
-  inkRect(g, x - size * 0.13, y, size * 0.26, size * 0.42, 0xf0e6d0, size * 0.08, 1.4);
-  inkEllipse(g, x, y, size * 0.52, size * 0.36, STYLE.mushroom, 1.6);
-  g.circle(x - size * 0.16, y - size * 0.04, size * 0.09).fill(0xffffff);
-  g.circle(x + size * 0.13, y - size * 0.08, size * 0.07).fill(0xffffff);
-}
-
 function drawFlower(g: Graphics, x: number, y: number, color: number = STYLE.flowerWhite): void {
   g.circle(x - 3, y, 1.9).fill(color);
   g.circle(x + 3, y, 1.9).fill(color);
   g.circle(x, y - 3, 1.9).fill(color);
   g.circle(x, y + 1, 1.1).fill(STYLE.flowerYellow);
-}
-
-function drawBirchTree(g: Graphics, x: number, y: number, size: number): void {
-  inkRect(g, x - size * 0.08, y - size * 0.1, size * 0.16, size * 0.54, 0xf0ebe0, size * 0.04, 1.6);
-  g.rect(x - size * 0.06, y + size * 0.02, size * 0.03, size * 0.08).fill({ color: 0x3a3a3a, alpha: 0.5 });
-  g.rect(x + size * 0.02, y + size * 0.14, size * 0.04, size * 0.06).fill({ color: 0x3a3a3a, alpha: 0.4 });
-  inkPoly(g, blobPoints(x, y - size * 0.48, size * 0.56, 5), STYLE.leafLight, 2);
-  g.ellipse(x - size * 0.18, y - size * 0.68, size * 0.2, size * 0.12).fill({
-    color: 0xffffff,
-    alpha: 0.3,
-  });
-}
-
-function drawDeadTree(g: Graphics, x: number, y: number, size: number): void {
-  inkRect(g, x - size * 0.1, y - size * 0.05, size * 0.2, size * 0.48, STYLE.woodDark, size * 0.04, 1.6);
-  g.moveTo(x - size * 0.06, y - size * 0.05)
-    .lineTo(x - size * 0.4, y - size * 0.45)
-    .stroke({ width: 2, color: STYLE.woodDark });
-  g.moveTo(x - size * 0.4, y - size * 0.45)
-    .lineTo(x - size * 0.5, y - size * 0.62)
-    .stroke({ width: 1.4, color: STYLE.woodDark });
-  g.moveTo(x + size * 0.06, y + size * 0.05)
-    .lineTo(x + size * 0.35, y - size * 0.3)
-    .stroke({ width: 1.8, color: STYLE.woodDark });
-  g.moveTo(x + size * 0.35, y - size * 0.3)
-    .lineTo(x + size * 0.28, y - size * 0.48)
-    .stroke({ width: 1.2, color: STYLE.woodDark });
-  g.moveTo(x, y - size * 0.05)
-    .lineTo(x + size * 0.08, y - size * 0.55)
-    .stroke({ width: 1.6, color: STYLE.woodDark });
-}
-
-function drawBoulder(g: Graphics, x: number, y: number, size: number): void {
-  inkPoly(
-    g,
-    [x - size * 0.8, y + size * 0.45, x - size * 0.5, y - size * 0.4, x + size * 0.1, y - size * 0.55, x + size * 0.7, y - size * 0.3, x + size * 0.85, y + size * 0.45],
-    STYLE.stone,
-    2,
-  );
-  g.poly([x - size * 0.5, y - size * 0.4, x + size * 0.1, y - size * 0.55, x + size * 0.15, y - size * 0.1, x - size * 0.3, y - size * 0.05]).fill(
-    STYLE.stoneLight,
-  );
-  g.moveTo(x + size * 0.15, y - size * 0.1)
-    .lineTo(x + size * 0.42, y + size * 0.29)
-    .stroke({ width: 1, color: STYLE.stoneDark, alpha: 0.55 });
-  g.ellipse(x - size * 0.2, y - size * 0.25, size * 0.15, size * 0.08).fill({ color: STYLE.leafDark, alpha: 0.5 });
-  g.ellipse(x - size * 0.1, y - size * 0.2, size * 0.08, size * 0.05).fill({ color: STYLE.leaf, alpha: 0.4 });
-}
-
-function drawTallGrass(g: Graphics, x: number, y: number, size: number): void {
-  const blades = [[-2, 0.9], [0, 1.0], [2, 0.85], [4, 0.7]] as const;
-  for (const [dx, hf] of blades) {
-    const h = size * hf;
-    const tipX = x + dx + size * 0.15;
-    g.moveTo(x + dx, y)
-      .quadraticCurveTo(x + dx, y - h * 0.6, tipX, y - h)
-      .stroke({ width: 1.6, color: STYLE.leafDark, alpha: 0.85 });
-  }
 }
 
 function drawLily(g: Graphics, x: number, y: number, r: number): void {
@@ -527,7 +353,3 @@ function drawLily(g: Graphics, x: number, y: number, r: number): void {
   g.circle(x - r * 0.3, y - r * 0.3, r * 0.35).fill({ color: STYLE.leafLight, alpha: 0.7 });
 }
 
-function drawReed(g: Graphics, x: number, y: number, h: number): void {
-  inkRect(g, x - 1.2, y - h, 2.4, h, STYLE.leafDark, 0, 1);
-  g.circle(x, y - h, 2.2).fill(STYLE.wood);
-}

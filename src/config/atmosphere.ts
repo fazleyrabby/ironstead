@@ -1,5 +1,5 @@
-// HD-2D look for the 3D renderer: tilted perspective camera, upright sprite
-// billboards, dusk lighting, tilt-shift and bloom. Render-only; the sim never
+// Diorama look for the 3D renderer: tilted perspective camera, low-poly
+// models, dusk lighting, tilt-shift and bloom. Render-only; the sim never
 // reads it.
 export const VIEW3D = {
   camera: {
@@ -7,14 +7,6 @@ export const VIEW3D = {
     // Degrees down from the horizon.
     pitch: 42,
     startZoom: 1.15,
-  },
-
-  billboard: {
-    // Upright sprites are stretched to counter the camera's foreshortening.
-    stretch: 1.22,
-    treeScale: 1.4,
-    propScale: 1.3,
-    alphaTest: 0.4,
   },
 
   slab: {

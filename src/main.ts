@@ -4,7 +4,6 @@ import { TILE_SIZE, worldToTile } from "./config/world";
 import { EventBus } from "./core/EventBus";
 import { GameLoop } from "./core/GameLoop";
 import { InputManager } from "./input/InputManager";
-import { loadGameAssets, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./render/Assets";
 import { SelectionBox } from "./render/SelectionBox";
 import { Scene3D } from "./render3d/Scene3D";
 import { Game } from "./sim/Game";
@@ -40,8 +39,6 @@ async function main(): Promise<void> {
 
   const events = new EventBus();
   const game = new Game(events);
-
-  if (USE_SPRITE_ASSETS || USE_V2_ASSET_PROTOTYPES) await loadGameAssets();
 
   const scene = await Scene3D.create();
   mount.appendChild(scene.canvas);
