@@ -77,7 +77,17 @@ interface Entry {
   hpBucket: number;
   rallyOn: boolean;
   z: number;
+  wx: number;
+  wy: number;
+  radius: number;
   anim: Anim;
+}
+
+export interface UnitView {
+  container: Container;
+  x: number;
+  y: number;
+  radius: number;
 }
 
 export class UnitRenderer {
@@ -134,6 +144,15 @@ export class UnitRenderer {
     }
   }
 
+  // World position is tracked separately: the 3D renderer moves each container
+  // into an atlas cell after update().
+  forEachView(visit: (view: UnitView) => void): void {
+    for (const entry of this.entries.values()) {
+      if (!entry.container.visible) continue;
+      visit({ container: entry.container, x: entry.wx, y: entry.wy, radius: entry.radius });
+    }
+  }
+
   private enemyMode(map: VisibilityMap, unit: Unit): "sync" | "freeze" | "hide" {
     const tile = worldToTile(unit.x, unit.y);
     if (isTileVisible(map, tile.x, tile.y)) return "sync";
@@ -187,6 +206,9 @@ export class UnitRenderer {
       hpBucket: -1,
       rallyOn: false,
       z: Number.NaN,
+      wx: unit.x,
+      wy: unit.y,
+      radius: unitDef(unit.type).radius,
       anim: {
         phase: Math.random() * Math.PI * 2,
         move: 0,
@@ -205,6 +227,8 @@ export class UnitRenderer {
 
   private sync(entry: Entry, unit: Unit, selected: boolean, nowSec: number, frameDt: number): void {
     entry.container.position.set(unit.x, unit.y);
+    entry.wx = unit.x;
+    entry.wy = unit.y;
     if (entry.z !== unit.y) {
       entry.z = unit.y;
       entry.container.zIndex = unit.y;
@@ -245,7 +269,7 @@ export class UnitRenderer {
       entry.selected = selected;
       entry.hpBucket = hpBucket;
       entry.rallyOn = rallyOn;
-      redrawOverlay(entry.overlay, unit, selected, rallyOn);
+      redrawOverlay(entry.overlay, unit, selected);
     }
   }
 
@@ -454,9 +478,6 @@ function buildRig(unit: Unit): Rig {
   const body = new Container();
   root.addChild(body);
 
-  const shadow = new Graphics();
-  shadow.ellipse(0, r * 1.05, r * 0.95, r * 0.36).fill({ color: 0x000000, alpha: 0.24 });
-  root.addChildAt(shadow, 0);
 
   if (type === "horse_rider") return buildHorseRig(r, faction, root, body);
 
@@ -747,22 +768,11 @@ function buildWeapon(type: Unit["type"]): Container {
   return holder;
 }
 
-function redrawOverlay(g: Graphics, unit: Unit, selected: boolean, rallyOn: boolean): void {
+// Rings are drawn on the ground by the 3D renderer; only the HP bar lives here.
+function redrawOverlay(g: Graphics, unit: Unit, selected: boolean): void {
   g.clear();
   const definition = unitDef(unit.type);
   const radius = definition.radius;
-
-  if (rallyOn) {
-    g.circle(0, 0, radius + 9).stroke({ width: 2, color: 0xf2c14e, alpha: 0.85 });
-  }
-
-  if (selected) {
-    g.circle(0, 0, radius + 6).stroke({ width: 2.5, color: 0x7ee081, alpha: 0.95 });
-  }
-
-  if (unit.type === "hero") {
-    g.circle(0, 0, radius + 12).stroke({ width: 1.5, color: 0xf2c14e, alpha: 0.4 });
-  }
 
   if (selected || unit.hp < unit.maxHp) {
     const barW = Math.max(24, radius * 2 + 6);

@@ -1,13 +1,31 @@
-// HD-2D style "diorama" look: tilt-shift blur, bloom, dusk lighting, fireflies.
-// Everything here is render-only; the sim never reads it.
-export const ATMOSPHERE = {
-  enabled: true,
+// HD-2D look for the 3D renderer: tilted perspective camera, upright sprite
+// billboards, dusk lighting, tilt-shift and bloom. Render-only; the sim never
+// reads it.
+export const VIEW3D = {
+  camera: {
+    fov: 30,
+    // Degrees down from the horizon.
+    pitch: 42,
+    startZoom: 1.15,
+  },
+
+  billboard: {
+    // Upright sprites are stretched to counter the camera's foreshortening.
+    stretch: 1.22,
+    treeScale: 1.4,
+    propScale: 1.3,
+    alphaTest: 0.4,
+  },
+
+  slab: {
+    depth: 150,
+  },
 
   tiltShift: {
-    // Max blur radius in screen px at the top/bottom edge of the viewport.
+    // Max blur radius in CSS px at the top/bottom edge of the viewport.
     maxBlur: 7,
     // Vertical centre of the sharp band (0 = top, 1 = bottom).
-    focus: 0.52,
+    focus: 0.55,
     // Half-height of the fully sharp band, as a fraction of the viewport.
     band: 0.2,
     // Blur fades out as the camera zooms out so armies stay readable.
@@ -16,26 +34,30 @@ export const ATMOSPHERE = {
   },
 
   bloom: {
-    strength: 0.55,
-    threshold: 0.72,
-    radius: 14,
+    strength: 0.32,
+    radius: 0.55,
+    threshold: 0.9,
   },
 
   grade: {
-    vignette: 0.42,
-    contrast: 1.08,
-    saturation: 1.12,
+    vignette: 0.4,
+    saturation: 1.1,
   },
 
   lighting: {
-    // Multiplied over the world; lights punch back towards white.
-    ambient: 0x7c84b4,
-    buildingLight: 0xffc27a,
-    unitLight: 0xffd9a8,
-    unitRadius: 78,
-    unitIntensity: 0.4,
-    // Light map resolution relative to world px.
-    mapScale: 0.25,
+    // Matches the fog-of-war colour so the void and unexplored land read as one.
+    background: 0x070912,
+    haze: 0x1a2140,
+    sky: 0x9aa8e8,
+    ground: 0x55486a,
+    hemisphere: 2.1,
+    sun: 0xffb877,
+    sunIntensity: 2.6,
+    // Direction the light travels from (x, up, z); low and from the south-west.
+    sunFrom: [-0.62, 0.58, 0.52],
+    shadowMap: 4096,
+    buildingLight: 0xffb060,
+    pointLights: 6,
   },
 
   fireflies: 70,

@@ -1,5 +1,3 @@
-import { Container, Graphics } from "pixi.js";
-
 export interface BoxRect {
   x0: number;
   y0: number;
@@ -7,25 +5,36 @@ export interface BoxRect {
   y1: number;
 }
 
+// Drag-select rectangle as a DOM overlay above the game canvas.
 export class SelectionBox {
-  private readonly graphics: Graphics;
+  private readonly element: HTMLDivElement;
 
-  constructor(screenLayer: Container) {
-    this.graphics = new Graphics();
-    screenLayer.addChild(this.graphics);
+  constructor(parent: HTMLElement) {
+    this.element = document.createElement("div");
+    Object.assign(this.element.style, {
+      position: "absolute",
+      display: "none",
+      pointerEvents: "none",
+      background: "rgba(126, 224, 129, 0.12)",
+      border: "1.5px solid rgba(126, 224, 129, 0.9)",
+      boxSizing: "border-box",
+    });
+    parent.appendChild(this.element);
   }
 
   update(rect: BoxRect | undefined): void {
-    this.graphics.clear();
-    if (!rect) return;
-
-    const x = Math.min(rect.x0, rect.x1);
-    const y = Math.min(rect.y0, rect.y1);
-    const w = Math.abs(rect.x1 - rect.x0);
-    const h = Math.abs(rect.y1 - rect.y0);
-    if (w < 3 && h < 3) return;
-
-    this.graphics.rect(x, y, w, h).fill({ color: 0x7ee081, alpha: 0.12 });
-    this.graphics.rect(x, y, w, h).stroke({ width: 1.5, color: 0x7ee081, alpha: 0.9 });
+    const w = rect ? Math.abs(rect.x1 - rect.x0) : 0;
+    const h = rect ? Math.abs(rect.y1 - rect.y0) : 0;
+    if (!rect || (w < 3 && h < 3)) {
+      this.element.style.display = "none";
+      return;
+    }
+    Object.assign(this.element.style, {
+      display: "block",
+      left: `${Math.min(rect.x0, rect.x1)}px`,
+      top: `${Math.min(rect.y0, rect.y1)}px`,
+      width: `${w}px`,
+      height: `${h}px`,
+    });
   }
 }

@@ -49,8 +49,68 @@ function blobPoints(cx: number, cy: number, r: number, bumps: number): number[] 
   return points;
 }
 
-export function buildWorldScene(world: Container): Container {
+export type PropKind =
+  | "round"
+  | "round_autumn"
+  | "pine"
+  | "birch"
+  | "dead"
+  | "bush"
+  | "rock"
+  | "boulder"
+  | "stump"
+  | "mushroom"
+  | "tall_grass"
+  | "reed";
+
+export interface PropInstance {
+  kind: PropKind;
+  x: number;
+  y: number;
+  size: number;
+}
+
+// Draws one standing prop at the origin; the 3D renderer bakes these to billboards.
+export function drawProp(g: Graphics, kind: PropKind, size: number): void {
+  switch (kind) {
+    case "round":
+      return drawRoundTree(g, 0, 0, size, false);
+    case "round_autumn":
+      return drawRoundTree(g, 0, 0, size, true);
+    case "pine":
+      return drawPine(g, 0, 0, size);
+    case "birch":
+      return drawBirchTree(g, 0, 0, size);
+    case "dead":
+      return drawDeadTree(g, 0, 0, size);
+    case "bush":
+      return drawBush(g, 0, 0, size);
+    case "rock":
+      return drawRock(g, 0, 0, size);
+    case "boulder":
+      return drawBoulder(g, 0, 0, size);
+    case "stump":
+      return drawStump(g, 0, 0, size);
+    case "mushroom":
+      return drawMushroom(g, 0, 0, size);
+    case "tall_grass":
+      return drawTallGrass(g, 0, 0, size);
+    case "reed":
+      return drawReed(g, 0, 0, size);
+  }
+}
+
+// Flat ground art plus the list of standing props (trees, rocks, reeds) that
+// the 3D renderer places as upright billboards.
+export function buildWorldScene(): { ground: Container; props: PropInstance[] } {
   const rand = mulberry32(1337);
+  const props: PropInstance[] = [];
+  const stand = (kind: PropKind, x: number, y: number, size: number): void => {
+    props.push({ kind, x, y, size });
+  };
+  const standTree = (x: number, y: number, size: number, autumn: boolean): void => {
+    stand(autumn ? "round_autumn" : "round", x, y, size);
+  };
   const terrainLayer = new Container();
   const terrain = new Graphics();
 
@@ -140,8 +200,8 @@ export function buildWorldScene(world: Container): Container {
     }
     for (let i = 0; i < 9; i += 1) {
       const a = rand() * Math.PI * 2;
-      drawReed(
-        terrain,
+      stand(
+        "reed",
         px + Math.cos(a) * (r + 5),
         py + Math.sin(a) * (r * 0.85 + 5),
         8 + rand() * 9,
@@ -230,10 +290,10 @@ export function buildWorldScene(world: Container): Container {
     if (blockedAt(x, y, 260, 130)) continue;
     const autumn = rand() < 0.14;
     const treeRoll = rand();
-    if (treeRoll < 0.38) drawRoundTree(decor, x, y, 13 + rand() * 9, autumn);
-    else if (treeRoll < 0.72) drawPine(decor, x, y, 12 + rand() * 8);
-    else if (treeRoll < 0.88) drawBirchTree(decor, x, y, 13 + rand() * 8);
-    else drawDeadTree(decor, x, y, 11 + rand() * 7);
+    if (treeRoll < 0.38) standTree(x, y, 13 + rand() * 9, autumn);
+    else if (treeRoll < 0.72) stand("pine", x, y, 12 + rand() * 8);
+    else if (treeRoll < 0.88) stand("birch", x, y, 13 + rand() * 8);
+    else stand("dead", x, y, 11 + rand() * 7);
   }
 
   for (let c = 0; c < 60; c += 1) {
@@ -247,9 +307,9 @@ export function buildWorldScene(world: Container): Container {
       const x = cx + Math.cos(a) * d;
       const y = cy + Math.sin(a) * d;
       if (blockedAt(x, y, 270, 125)) continue;
-      if (rand() < 0.55) drawRoundTree(decor, x, y, 12 + rand() * 9, rand() < 0.16);
-      else if (rand() < 0.7) drawPine(decor, x, y, 11 + rand() * 8);
-      else drawBirchTree(decor, x, y, 12 + rand() * 7);
+      if (rand() < 0.55) standTree(x, y, 12 + rand() * 9, rand() < 0.16);
+      else if (rand() < 0.7) stand("pine", x, y, 11 + rand() * 8);
+      else stand("birch", x, y, 12 + rand() * 7);
     }
   }
 
@@ -258,13 +318,13 @@ export function buildWorldScene(world: Container): Container {
     const y = 80 + rand() * (WORLD_HEIGHT - 160);
     if (blockedAt(x, y, 260, 120)) continue;
     const roll = rand();
-    if (roll < 0.24) drawBush(decor, x, y, 5 + rand() * 4);
-    else if (roll < 0.42) drawRock(decor, x, y, 4 + rand() * 5);
-    else if (roll < 0.54) drawBoulder(decor, x, y, 6 + rand() * 6);
-    else if (roll < 0.66) drawStump(decor, x, y, 4 + rand() * 3);
-    else if (roll < 0.78) drawMushroom(decor, x, y, 4 + rand() * 3);
-    else if (roll < 0.88) drawTallGrass(decor, x, y, 5 + rand() * 4);
-    else drawRoundTree(decor, x, y, 11 + rand() * 7, true);
+    if (roll < 0.24) stand("bush", x, y, 5 + rand() * 4);
+    else if (roll < 0.42) stand("rock", x, y, 4 + rand() * 5);
+    else if (roll < 0.54) stand("boulder", x, y, 6 + rand() * 6);
+    else if (roll < 0.66) stand("stump", x, y, 4 + rand() * 3);
+    else if (roll < 0.78) stand("mushroom", x, y, 4 + rand() * 3);
+    else if (roll < 0.88) stand("tall_grass", x, y, 5 + rand() * 4);
+    else standTree(x, y, 11 + rand() * 7, true);
   }
 
   for (let i = 0; i < 460; i += 1) {
@@ -297,8 +357,7 @@ export function buildWorldScene(world: Container): Container {
   }
 
   terrainLayer.addChild(terrain, territory, decor);
-  world.addChild(terrainLayer);
-  return terrainLayer;
+  return { ground: terrainLayer, props };
 }
 
 function drawCropPlot(g: Graphics, x: number, y: number, size: number, rand: () => number): void {
@@ -324,7 +383,6 @@ function drawCropPlot(g: Graphics, x: number, y: number, size: number, rand: () 
 }
 
 function drawRoundTree(g: Graphics, x: number, y: number, size: number, autumn: boolean): void {
-  groundShadow(g, x, y + size * 0.42, size * 0.64, size * 0.26);
   inkRect(g, x - size * 0.1, y - size * 0.12, size * 0.2, size * 0.56, STYLE.woodDark, size * 0.05, 1.6);
   const leaf = autumn ? STYLE.autumn : STYLE.leaf;
   const leafLight = autumn ? STYLE.autumnLight : STYLE.leafLight;
@@ -340,7 +398,6 @@ function drawRoundTree(g: Graphics, x: number, y: number, size: number, autumn: 
 }
 
 function drawPine(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.5, size * 0.6, size * 0.24);
   inkRect(g, x - size * 0.1, y, size * 0.2, size * 0.5, STYLE.woodDark, 0, 1.5);
   const shades = [STYLE.leafDark, STYLE.leaf, STYLE.leafLight];
   for (let i = 0; i < 3; i += 1) {
@@ -354,7 +411,6 @@ function drawPine(g: Graphics, x: number, y: number, size: number): void {
 }
 
 function drawBush(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.4, size * 0.52, size * 0.2);
   inkPoly(g, blobPoints(x, y, size * 0.6, 4), STYLE.leaf, 1.8);
   g.ellipse(x - size * 0.18, y - size * 0.22, size * 0.22, size * 0.13).fill({
     color: STYLE.leafLight,
@@ -364,7 +420,6 @@ function drawBush(g: Graphics, x: number, y: number, size: number): void {
 }
 
 function drawRock(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.5, size * 0.72, size * 0.24);
   inkPoly(
     g,
     [x - size * 0.72, y + size * 0.4, x - size * 0.32, y - size * 0.62, x + size * 0.42, y - size * 0.5, x + size * 0.8, y + size * 0.4],
@@ -380,7 +435,6 @@ function drawRock(g: Graphics, x: number, y: number, size: number): void {
 }
 
 function drawStump(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.3, size * 0.5, size * 0.2);
   inkEllipse(g, x, y + size * 0.12, size * 0.42, size * 0.28, STYLE.woodDark, 1.6);
   inkEllipse(g, x, y - size * 0.16, size * 0.42, size * 0.28, STYLE.woodLight, 1.6);
   g.ellipse(x, y - size * 0.16, size * 0.2, size * 0.12).stroke({
@@ -396,7 +450,6 @@ function drawStump(g: Graphics, x: number, y: number, size: number): void {
 }
 
 function drawMushroom(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.42, size * 0.42, size * 0.14);
   inkRect(g, x - size * 0.13, y, size * 0.26, size * 0.42, 0xf0e6d0, size * 0.08, 1.4);
   inkEllipse(g, x, y, size * 0.52, size * 0.36, STYLE.mushroom, 1.6);
   g.circle(x - size * 0.16, y - size * 0.04, size * 0.09).fill(0xffffff);
@@ -411,7 +464,6 @@ function drawFlower(g: Graphics, x: number, y: number, color: number = STYLE.flo
 }
 
 function drawBirchTree(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.42, size * 0.58, size * 0.24);
   inkRect(g, x - size * 0.08, y - size * 0.1, size * 0.16, size * 0.54, 0xf0ebe0, size * 0.04, 1.6);
   g.rect(x - size * 0.06, y + size * 0.02, size * 0.03, size * 0.08).fill({ color: 0x3a3a3a, alpha: 0.5 });
   g.rect(x + size * 0.02, y + size * 0.14, size * 0.04, size * 0.06).fill({ color: 0x3a3a3a, alpha: 0.4 });
@@ -423,7 +475,6 @@ function drawBirchTree(g: Graphics, x: number, y: number, size: number): void {
 }
 
 function drawDeadTree(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.4, size * 0.5, size * 0.18);
   inkRect(g, x - size * 0.1, y - size * 0.05, size * 0.2, size * 0.48, STYLE.woodDark, size * 0.04, 1.6);
   g.moveTo(x - size * 0.06, y - size * 0.05)
     .lineTo(x - size * 0.4, y - size * 0.45)
@@ -443,7 +494,6 @@ function drawDeadTree(g: Graphics, x: number, y: number, size: number): void {
 }
 
 function drawBoulder(g: Graphics, x: number, y: number, size: number): void {
-  groundShadow(g, x, y + size * 0.5, size * 0.8, size * 0.28);
   inkPoly(
     g,
     [x - size * 0.8, y + size * 0.45, x - size * 0.5, y - size * 0.4, x + size * 0.1, y - size * 0.55, x + size * 0.7, y - size * 0.3, x + size * 0.85, y + size * 0.45],

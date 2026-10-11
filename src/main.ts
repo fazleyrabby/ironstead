@@ -1,21 +1,12 @@
-import { Application, Container } from "pixi.js";
-import { ATMOSPHERE } from "./config/atmosphere";
+import { VIEW3D } from "./config/atmosphere";
 import { MAP_LAYOUT } from "./config/map";
-import { GRID_COLS, GRID_ROWS, TILE_SIZE, worldToTile } from "./config/world";
+import { TILE_SIZE, worldToTile } from "./config/world";
 import { EventBus } from "./core/EventBus";
 import { GameLoop } from "./core/GameLoop";
 import { InputManager } from "./input/InputManager";
 import { loadGameAssets, USE_SPRITE_ASSETS, USE_V2_ASSET_PROTOTYPES } from "./render/Assets";
-import { BuildingRenderer } from "./render/BuildingRenderer";
-import { Camera } from "./render/Camera";
-import { FogRenderer } from "./render/FogRenderer";
-import { LightRenderer } from "./render/LightRenderer";
-import { PlacementGhost } from "./render/PlacementGhost";
-import { PostFX } from "./render/PostFX";
-import { ProjectileRenderer } from "./render/ProjectileRenderer";
 import { SelectionBox } from "./render/SelectionBox";
-import { UnitRenderer } from "./render/UnitRenderer";
-import { buildWorldScene } from "./render/WorldScene";
+import { Scene3D } from "./render3d/Scene3D";
 import { Game } from "./sim/Game";
 import { spawnUnit } from "./sim/GameState";
 import { buildingAtTile, def, unitDef } from "./sim/selectors";
@@ -47,58 +38,21 @@ async function main(): Promise<void> {
   const hudBottom = document.getElementById("hud-bottom");
   if (!hudTop || !hudBottom) throw new Error("Missing HUD mount points");
 
-  const app = new Application();
-  await app.init({
-    width: window.innerWidth,
-    height: window.innerHeight,
-    background: 0x0b0b14,
-    antialias: true,
-    autoDensity: true,
-    resolution: window.devicePixelRatio || 1,
-  });
-  app.ticker.stop();
-  mount.appendChild(app.canvas);
-
-  const world = new Container();
-  // Untransformed wrapper: post-FX filters sit here so their area stays in screen space.
-  const scene = new Container();
-  scene.addChild(world);
-  const screenLayer = new Container();
-  app.stage.addChild(scene, screenLayer);
-  buildWorldScene(world);
-
-  const entityLayer = new Container();
-  entityLayer.sortableChildren = true;
-  const projectileLayer = new Container();
-  const lightLayer = new Container();
-  const ghostLayer = new Container();
-  const fogLayer = new Container();
-  world.addChild(entityLayer, projectileLayer, lightLayer, ghostLayer, fogLayer);
-
   const events = new EventBus();
   const game = new Game(events);
-  const camera = new Camera(world);
-  camera.resize(app.screen.width, app.screen.height);
 
   if (USE_SPRITE_ASSETS || USE_V2_ASSET_PROTOTYPES) await loadGameAssets();
 
+  const scene = await Scene3D.create();
+  mount.appendChild(scene.canvas);
+  const camera = scene.camera;
+  scene.resize(window.innerWidth, window.innerHeight);
+
   const baseTile = MAP_LAYOUT.player.baseTile;
   const baseCenter = { x: baseTile.x * TILE_SIZE, y: baseTile.y * TILE_SIZE };
-  camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
+  camera.centerOn(baseCenter.x, baseCenter.y, VIEW3D.camera.startZoom);
 
-  const buildingRenderer = new BuildingRenderer(entityLayer);
-  const unitRenderer = new UnitRenderer(entityLayer);
-  const projectileRenderer = new ProjectileRenderer(projectileLayer);
-  const fog = new FogRenderer(fogLayer, GRID_COLS, GRID_ROWS);
-  const ghost = new PlacementGhost(ghostLayer);
-  const lights = ATMOSPHERE.enabled ? new LightRenderer(lightLayer, app.renderer) : undefined;
-  const postFx = ATMOSPHERE.enabled ? new PostFX(app.renderer.resolution) : undefined;
-  if (postFx) {
-    // Pin the filter to the viewport so its UVs are screen-relative at any zoom.
-    scene.filterArea = app.screen;
-    scene.filters = [postFx.filter];
-  }
-  const selectionBox = new SelectionBox(screenLayer);
+  const selectionBox = new SelectionBox(mount);
   const sfx = new SoundFX();
   const hud = new Hud(hudTop, {
     isSoundOn: () => sfx.isEnabled(),
@@ -143,13 +97,21 @@ async function main(): Promise<void> {
     return pending ? placementOrigin(pending, tile) : tile;
   }
 
-  function unitAtPoint(worldX: number, worldY: number) {
+  // Sprites stand upright, so the cursor is over a unit's body rather than the
+  // ground under its feet: pick in screen space against the body centre.
+  function pickScore(unit: { x: number; y: number; type: UnitType }, screenX: number, screenY: number): number {
+    const radius = unitDef(unit.type).radius;
+    const body = camera.worldToScreen(unit.x, unit.y, radius * 1.3);
+    return Math.hypot(body.x - screenX, body.y - screenY) / camera.zoomLevel() - radius;
+  }
+
+  function unitAtPoint(screenX: number, screenY: number) {
     const player = game.state.players.player;
     let best: (typeof player.units)[number] | undefined;
     let bestScore = 18;
     for (const unit of player.units) {
       if (unit.state === "dead") continue;
-      const score = Math.hypot(unit.x - worldX, unit.y - worldY) - unitDef(unit.type).radius;
+      const score = pickScore(unit, screenX, screenY);
       if (score < bestScore) {
         bestScore = score;
         best = unit;
@@ -158,7 +120,7 @@ async function main(): Promise<void> {
     return best;
   }
 
-  function enemyUnitAtPoint(worldX: number, worldY: number) {
+  function enemyUnitAtPoint(screenX: number, screenY: number) {
     const enemy = game.state.players.enemy;
     const seenBy = game.visibility.player;
     let best: (typeof enemy.units)[number] | undefined;
@@ -167,7 +129,7 @@ async function main(): Promise<void> {
       if (unit.state === "dead") continue;
       const tile = worldToTile(unit.x, unit.y);
       if (!isTileVisible(seenBy, tile.x, tile.y)) continue;
-      const score = Math.hypot(unit.x - worldX, unit.y - worldY) - unitDef(unit.type).radius;
+      const score = pickScore(unit, screenX, screenY);
       if (score < bestScore) {
         bestScore = score;
         best = unit;
@@ -217,7 +179,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    const hitUnit = unitAtPoint(worldPoint.x, worldPoint.y);
+    const hitUnit = unitAtPoint(screenX, screenY);
     if (hitUnit) {
       const now = performance.now();
       const doubleClick =
@@ -262,18 +224,18 @@ async function main(): Promise<void> {
   }
 
   function handleBox(x0: number, y0: number, x1: number, y1: number): void {
-    const a = camera.screenToWorld(x0, y0);
-    const b = camera.screenToWorld(x1, y1);
-    const minX = Math.min(a.x, b.x);
-    const maxX = Math.max(a.x, b.x);
-    const minY = Math.min(a.y, b.y);
-    const maxY = Math.max(a.y, b.y);
+    const minX = Math.min(x0, x1);
+    const maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1);
+    const maxY = Math.max(y0, y1);
 
+    // Under perspective the box is a trapezoid on the ground, so test on screen.
     const ids = game.state.players.player.units
-      .filter(
-        (unit) =>
-          unit.state !== "dead" && unit.x >= minX && unit.x <= maxX && unit.y >= minY && unit.y <= maxY,
-      )
+      .filter((unit) => {
+        if (unit.state === "dead") return false;
+        const p = camera.worldToScreen(unit.x, unit.y, unitDef(unit.type).radius);
+        return p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+      })
       .map((unit) => unit.id);
 
     game.execute({ type: "SELECT_UNITS", unitIds: ids });
@@ -287,10 +249,13 @@ async function main(): Promise<void> {
       game.execute({ type: "CANCEL_PLACEMENT" });
       return;
     }
-    orderAtWorld(camera.screenToWorld(screenX, screenY));
+    orderAtWorld(camera.screenToWorld(screenX, screenY), enemyUnitAtPoint(screenX, screenY));
   }
 
-  function orderAtWorld(worldPoint: { x: number; y: number }): void {
+  function orderAtWorld(
+    worldPoint: { x: number; y: number },
+    enemyUnit?: ReturnType<typeof enemyUnitAtPoint>,
+  ): void {
     const selectedIds = game.state.ui.selectedUnitIds;
     if (selectedIds.length === 0) {
       // no units selected: right-click sets a rally point on a selected building
@@ -306,7 +271,6 @@ async function main(): Promise<void> {
       return;
     }
 
-    const enemyUnit = enemyUnitAtPoint(worldPoint.x, worldPoint.y);
     if (enemyUnit) {
       game.execute({
         type: "ATTACK_TARGET",
@@ -351,7 +315,7 @@ async function main(): Promise<void> {
     game.execute({ type: "MOVE_UNITS", unitIds: selectedIds, x: worldPoint.x, y: worldPoint.y });
   }
 
-  const input = new InputManager(app.canvas, camera, {
+  const input = new InputManager(scene.canvas, camera, {
     onPrimaryClick: handlePrimary,
     onSecondaryClick: handleSecondary,
     onBoxSelect: handleBox,
@@ -378,7 +342,7 @@ async function main(): Promise<void> {
         game.execute({ type: "STOP", unitIds: game.state.ui.selectedUnitIds });
       }
       if (code === "KeyC") {
-        camera.centerOn(baseCenter.x, baseCenter.y, 1.05);
+        camera.centerOn(baseCenter.x, baseCenter.y, VIEW3D.camera.startZoom);
       }
       if (code === "KeyR") {
         game.execute({ type: "ACTIVATE_HERO" });
@@ -482,34 +446,17 @@ async function main(): Promise<void> {
         result = canPlace(game.state, game.nav, "player", pending, hover.x, hover.y);
       }
 
-      ghost.update(game.state.ui, result);
-      buildingRenderer.update(game.state, game.state.ui.selectedBuildingId, game.visibility.player);
-      unitRenderer.update(
-        game.state,
-        game.state.ui.selectedUnitIds,
-        game.visibility.player,
-        performance.now() / 1000,
-        frameTime,
-      );
-      projectileRenderer.update(game.state.projectiles);
-      fog.update(game.visibility.player);
-      lights?.update(game.state, game.visibility.player, performance.now() / 1000);
-      postFx?.update(camera.zoomLevel());
+      scene.render(game.state, game.visibility.player, result, performance.now() / 1000, frameTime);
       selectionBox.update(input.dragBox.active ? input.dragBox : undefined);
       hud.update(game.state, loop.timeScale);
       commandPanel.update(game.state);
       minimap.update(game.state, game.visibility.player, camera);
       outcome.update(game.state.status, game.state.stats, game.state.time);
-      app.renderer.render(app.stage);
     },
   );
   loop.timeScale = 0;
   loop.start();
 
-  window.addEventListener("resize", () => {
-    app.renderer.resize(window.innerWidth, window.innerHeight);
-    camera.resize(app.screen.width, app.screen.height);
-  });
 }
 
 void main();

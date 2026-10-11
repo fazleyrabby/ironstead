@@ -27,6 +27,12 @@ interface Entry {
   selected: boolean;
   hpBucket: number;
   z: number;
+  building: Building;
+}
+
+export interface BuildingView {
+  container: Container;
+  building: Building;
 }
 
 export class BuildingRenderer {
@@ -65,6 +71,13 @@ export class BuildingRenderer {
       if (seen.has(id)) continue;
       entry.container.destroy({ children: true });
       this.entries.delete(id);
+    }
+  }
+
+  forEachView(visit: (view: BuildingView) => void): void {
+    for (const entry of this.entries.values()) {
+      if (!entry.container.visible) continue;
+      visit({ container: entry.container, building: entry.building });
     }
   }
 
@@ -130,11 +143,13 @@ export class BuildingRenderer {
       selected: false,
       hpBucket: -1,
       z: Number.NaN,
+      building,
     };
   }
 
   private sync(entry: Entry, building: Building, selected: boolean): void {
     entry.container.position.set(building.x, building.y);
+    entry.building = building;
     if (entry.z !== building.y) {
       entry.z = building.y;
       entry.container.zIndex = building.y;
@@ -158,7 +173,7 @@ export class BuildingRenderer {
     if (entry.selected !== selected || entry.hpBucket !== hpBucket) {
       entry.selected = selected;
       entry.hpBucket = hpBucket;
-      redrawOverlay(entry.overlay, building, selected);
+      redrawOverlay(entry.overlay, building);
     }
 
     entry.progress.clear();
@@ -177,18 +192,11 @@ export class BuildingRenderer {
   }
 }
 
-function redrawOverlay(g: Graphics, building: Building, selected: boolean): void {
+// The selection outline is drawn on the ground by the 3D renderer.
+function redrawOverlay(g: Graphics, building: Building): void {
   g.clear();
   const w = building.width;
   const h = building.height;
-
-  if (selected) {
-    g.roundRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 8).stroke({
-      width: 3,
-      color: 0xffe066,
-      alpha: 0.95,
-    });
-  }
 
   const ratio = building.hp / building.maxHp;
   if (building.hp < building.maxHp) {
