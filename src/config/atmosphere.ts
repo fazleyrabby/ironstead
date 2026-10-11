@@ -15,14 +15,15 @@ export const VIEW3D = {
 
   tiltShift: {
     // Max blur radius in CSS px at the top/bottom edge of the viewport.
-    maxBlur: 7,
+    maxBlur: 6,
     // Vertical centre of the sharp band (0 = top, 1 = bottom).
     focus: 0.55,
     // Half-height of the fully sharp band, as a fraction of the viewport.
     band: 0.2,
-    // Blur fades out as the camera zooms out so armies stay readable.
-    fullZoom: 1.1,
-    minZoomFactor: 0.3,
+    // Close-up only: no blur at play zoom so the whole battlefield stays sharp;
+    // it ramps in between these zoom levels.
+    startZoom: 1.8,
+    fullZoom: 2.5,
   },
 
   bloom: {

@@ -8,7 +8,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { VIEW3D } from "../config/atmosphere";
 import type { Quality } from "./quality";
 
-// Tilt-shift blur (golden-angle disc), then saturation and vignette.
+// Close-zoom tilt-shift blur (golden-angle disc), then saturation and vignette.
 const TiltShiftShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -45,14 +45,18 @@ const TiltShiftShader = {
       float radius = amount * uBlur;
 
       vec4 base = texture2D(tDiffuse, vUv);
-      vec3 sum = base.rgb;
-      for (int i = 0; i < TAPS; i += 1) {
-        float fi = float(i);
-        float r = sqrt((fi + 0.5) / float(TAPS));
-        vec2 dir = vec2(cos(fi * GOLDEN), sin(fi * GOLDEN)) * r;
-        sum += texture2D(tDiffuse, vUv + dir * radius * uTexel).rgb;
+      vec3 color = base.rgb;
+      // Skip the taps entirely where the image is in focus.
+      if (radius > 0.05) {
+        vec3 sum = base.rgb;
+        for (int i = 0; i < TAPS; i += 1) {
+          float fi = float(i);
+          float r = sqrt((fi + 0.5) / float(TAPS));
+          vec2 dir = vec2(cos(fi * GOLDEN), sin(fi * GOLDEN)) * r;
+          sum += texture2D(tDiffuse, vUv + dir * radius * uTexel).rgb;
+        }
+        color = sum / float(TAPS + 1);
       }
-      vec3 color = sum / float(TAPS + 1);
 
       float grey = dot(color, vec3(0.2126, 0.7152, 0.0722));
       color = mix(vec3(grey), color, uSaturation);
@@ -105,8 +109,8 @@ export class PostFX3D {
   render(zoom: number): void {
     if (this.tiltShift) {
       const { tiltShift } = VIEW3D;
-      const factor = Math.min(1, Math.max(tiltShift.minZoomFactor, zoom / tiltShift.fullZoom));
-      this.tiltShift.uniforms.uBlur.value = tiltShift.maxBlur * factor;
+      const ramp = (zoom - tiltShift.startZoom) / (tiltShift.fullZoom - tiltShift.startZoom);
+      this.tiltShift.uniforms.uBlur.value = tiltShift.maxBlur * Math.min(1, Math.max(0, ramp));
     }
     this.composer.render();
   }
