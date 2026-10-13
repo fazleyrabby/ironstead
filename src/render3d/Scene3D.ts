@@ -7,6 +7,7 @@ import type { GameState } from "../sim/types";
 import type { VisibilityMap } from "../sim/visibility";
 import { Bars3D } from "./Bars3D";
 import { Buildings3D } from "./Buildings3D";
+import { swayTime } from "./geo";
 import { Fog3D } from "./Fog3D";
 import { Lights3D } from "./Lights3D";
 import { Overlays3D } from "./Overlays3D";
@@ -149,7 +150,8 @@ export class Scene3D {
     this.renderer.info.reset();
 
     this.bars.begin();
-    this.buildings.update(state, visibility);
+    swayTime.value = nowSec;
+    this.buildings.update(state, visibility, frameDt);
     this.units.update(state, visibility, nowSec, frameDt);
     this.bars.end();
     this.overlays.update(state, placement);

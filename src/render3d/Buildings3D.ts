@@ -7,11 +7,15 @@ import type { VisibilityMap } from "../sim/visibility";
 import type { Bars3D } from "./Bars3D";
 import { buildingModel } from "./buildingModels";
 import type { BuildingModel } from "./buildingModels";
-import { modelMaterial } from "./geo";
+import { modelMaterial, Spring } from "./geo";
 
 interface Entry {
   group: Group;
   glow?: Mesh;
+  // Jelly wobble: positive stretches the building up, negative squashes it.
+  wobble: Spring;
+  wasConstructing: boolean;
+  lastHp: number;
 }
 
 // Low-poly building meshes, one group per building. Models are cached per
@@ -22,14 +26,14 @@ export class Buildings3D {
   private readonly entries = new Map<string, Entry>();
   private readonly models = new Map<string, BuildingModel>();
   // Colour above 1 so windows and gold clear the bloom threshold.
-  private readonly glowMaterial = new MeshBasicMaterial({ vertexColors: true, color: new Color(1.2, 1.2, 1.2) });
+  private readonly glowMaterial = new MeshBasicMaterial({ vertexColors: true, color: new Color(1, 1, 1) });
 
   constructor(scene: Scene, bars: Bars3D) {
     this.scene = scene;
     this.bars = bars;
   }
 
-  update(state: GameState, visibility: VisibilityMap): void {
+  update(state: GameState, visibility: VisibilityMap, frameDt: number): void {
     const seen = new Set<string>();
 
     for (const id of ["player", "enemy"] as const) {
@@ -52,7 +56,7 @@ export class Buildings3D {
           entry = this.create(building);
           this.entries.set(building.id, entry);
         }
-        this.sync(entry, building);
+        this.sync(entry, building, frameDt);
       }
     }
 
@@ -96,13 +100,25 @@ export class Buildings3D {
       group.add(glow);
     }
     this.scene.add(group);
-    return { group, glow };
+    // Lands squashed and springs up.
+    const wobble = new Spring(-0.35, 0);
+    return { group, glow, wobble, wasConstructing: building.state === "constructing", lastHp: building.hp };
   }
 
-  private sync(entry: Entry, building: Building): void {
+  private sync(entry: Entry, building: Building, frameDt: number): void {
     const building3dTop = Math.max(building.width, building.height) * 0.75 + 26;
     const constructing = building.state === "constructing";
-    entry.group.scale.y = constructing ? 0.12 + 0.88 * building.buildProgress : 1;
+    // Finishing pops the building up; taking damage makes it shudder.
+    if (entry.wasConstructing && !constructing) entry.wobble.kick(4.5);
+    if (building.hp < entry.lastHp && !constructing) entry.wobble.kick(-1.6);
+    entry.wasConstructing = constructing;
+    entry.lastHp = building.hp;
+
+    const wobble = entry.wobble.step(frameDt, 150, 8);
+    const rise = constructing ? 0.12 + 0.88 * building.buildProgress : 1;
+    const stretch = Math.max(0.4, 1 + wobble);
+    const girth = 1 / Math.sqrt(stretch);
+    entry.group.scale.set(girth, rise * stretch, girth);
     if (entry.glow) entry.glow.visible = !constructing;
 
     const barWidth = Math.max(building.width * 0.8, 34);

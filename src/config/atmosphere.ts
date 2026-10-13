@@ -1,5 +1,5 @@
-// Diorama look for the 3D renderer: tilted perspective camera, low-poly
-// models, dusk lighting, tilt-shift and bloom. Render-only; the sim never
+// Toy-diorama look for the 3D renderer: tilted perspective camera, chunky
+// models, bright daylight, tilt-shift and bloom. Render-only; the sim never
 // reads it.
 export const VIEW3D = {
   camera: {
@@ -27,29 +27,33 @@ export const VIEW3D = {
   },
 
   bloom: {
-    strength: 0.32,
-    radius: 0.55,
-    threshold: 0.9,
+    strength: 0.2,
+    radius: 0.5,
+    threshold: 0.96,
   },
 
   grade: {
-    vignette: 0.4,
-    saturation: 1.1,
+    vignette: 0.3,
+    saturation: 1.18,
   },
 
   lighting: {
     // Matches the fog-of-war colour so the void and unexplored land read as one.
     background: 0x070912,
-    haze: 0x1a2140,
-    sky: 0x9aa8e8,
-    ground: 0x55486a,
-    hemisphere: 2.1,
-    sun: 0xffb877,
-    sunIntensity: 2.6,
-    // Direction the light travels from (x, up, z); low and from the south-west.
-    sunFrom: [-0.62, 0.58, 0.52],
-    buildingLight: 0xffb060,
+    haze: 0x6f9fc8,
+    // Blue sky fill gives the shadows their cool tint; green bounce from grass.
+    sky: 0xd6e8ff,
+    ground: 0x8cab6c,
+    hemisphere: 1.85,
+    sun: 0xfff0d2,
+    sunIntensity: 2.7,
+    // Direction the light travels from (x, up, z); mid-morning from the south-west.
+    sunFrom: [-0.5, 0.9, 0.42],
+    buildingLight: 0xffc070,
+    // Window glow is only a hint in daylight.
+    buildingLightStrength: 0.25,
   },
 
-  fireflies: 70,
+  // Drifting pollen motes.
+  fireflies: 36,
 } as const;

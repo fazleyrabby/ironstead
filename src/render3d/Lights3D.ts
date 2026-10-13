@@ -107,8 +107,9 @@ export class Lights3D {
       flyGeometry,
       new PointsMaterial({
         map: this.glow,
-        color: new Color(0xe8ff9a).multiplyScalar(1.6),
-        size: 15,
+        color: new Color(0xfff6d0),
+        size: 9,
+        opacity: 0.7,
         transparent: true,
         blending: AdditiveBlending,
         depthWrite: false,
@@ -156,7 +157,7 @@ export class Lights3D {
       const flicker = 1 + 0.06 * Math.sin(time * 6.3 + building.x * 0.37 + building.y * 0.11);
       light.position.set(building.x, 58, building.y + building.height * 0.72);
       light.distance = radius * 1.9;
-      light.intensity = radius * radius * 0.085 * flicker;
+      light.intensity = radius * radius * 0.085 * flicker * VIEW3D.lighting.buildingLightStrength;
     });
 
     const positions = this.flies.geometry.attributes.position as BufferAttribute;
@@ -199,7 +200,7 @@ export class Lights3D {
         new SpriteMaterial({
           map: this.glow,
           color: VIEW3D.lighting.buildingLight,
-          opacity: 0.26,
+          opacity: 0.26 * VIEW3D.lighting.buildingLightStrength,
           blending: AdditiveBlending,
           depthWrite: false,
         }),
