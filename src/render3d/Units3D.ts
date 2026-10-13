@@ -382,6 +382,9 @@ interface Entry {
   heading: number;
   lastX: number;
   lastY: number;
+  // Drawn position: glides after the 30 Hz sim position instead of stepping.
+  x: number;
+  y: number;
   lastHp: number;
   wasMoving: boolean;
   lastBeat: number;
@@ -492,6 +495,8 @@ export class Units3D {
             heading: 0,
             lastX: unit.x,
             lastY: unit.y,
+            x: unit.x,
+            y: unit.y,
             lastHp: unit.hp,
             wasMoving: false,
             lastBeat: 0,
@@ -510,7 +515,7 @@ export class Units3D {
 
         if (selected.has(unit.id) || unit.hp < unit.maxHp) {
           const width = Math.max(24, unitDef(unit.type).radius * 2 + 6);
-          this.bars.add(unit.x, entry.rig.height + 9, unit.y, width, unit.hp / unit.maxHp);
+          this.bars.add(entry.x, entry.rig.height + 9, entry.y, width, unit.hp / unit.maxHp);
         }
       }
     }
@@ -522,9 +527,17 @@ export class Units3D {
     }
   }
 
+  // Where a unit is drawn this frame, for overlays that must track it exactly.
+  drawnPosition(id: string): { x: number; y: number } | undefined {
+    return this.entries.get(id);
+  }
+
   private animate(entry: Entry, unit: Unit, nowSec: number, frameDt: number): void {
     const { rig } = entry;
-    rig.root.position.set(unit.x, 0, unit.y);
+    const glide = 1 - Math.exp(-frameDt * 16);
+    entry.x += (unit.x - entry.x) * glide;
+    entry.y += (unit.y - entry.y) * glide;
+    rig.root.position.set(entry.x, 0, entry.y);
     rig.root.scale.setScalar(rig.scale * Math.max(0.01, 1 + entry.pop.step(frameDt, 210, 12)));
 
     const dx = unit.x - entry.lastX;
@@ -533,7 +546,7 @@ export class Units3D {
       const target = Math.atan2(dx, dy);
       let diff = target - entry.heading;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-      entry.heading += diff * Math.min(1, frameDt * 12);
+      entry.heading += diff * (1 - Math.exp(-frameDt * 9));
       entry.lastX = unit.x;
       entry.lastY = unit.y;
     }
@@ -556,13 +569,14 @@ export class Units3D {
     }
     entry.lastHp = unit.hp;
 
-    entry.move += ((moving ? 1 : 0) - entry.move) * Math.min(1, frameDt * 8);
+    entry.move += ((moving ? 1 : 0) - entry.move) * (1 - Math.exp(-frameDt * 6));
     const pace = Math.max(0.7, Math.min(1.7, unitDef(unit.type).speed / 70));
     entry.phase += frameDt * (rig.mounted ? 12 : 9) * pace * (0.15 + entry.move);
 
     const stride = Math.sin(entry.phase);
     const swing = stride * entry.move;
-    const hop = Math.abs(stride) * entry.move;
+    // sin² instead of |sin|: the hop eases into and out of the ground with no kink.
+    const hop = stride * stride * entry.move;
     // Stretch at the top of each hop, squash on landing; idle just breathes.
     const gait = (hop - 0.5) * 0.16 * entry.move;
     const breathe = Math.sin(nowSec * 2.4 + entry.phase) * 0.035 * (1 - entry.move);
@@ -578,7 +592,7 @@ export class Units3D {
     }
     entry.lastBeat = beat;
 
-    const squash = entry.squash.step(frameDt, 190, 9);
+    const squash = entry.squash.step(frameDt, 140, 10);
     const sy = Math.max(0.45, 1 + squash + gait + breathe);
     // Preserve volume: what the body loses in height it gains in girth.
     const sxz = 1 / Math.sqrt(sy);
@@ -587,13 +601,13 @@ export class Units3D {
 
     // Lean into travel, waddle side to side, lunge on a thrust.
     entry.lean.target = entry.move * 0.2 + (attacking ? 0.1 : 0);
-    rig.body.rotation.x = entry.lean.step(frameDt, 120, 9);
+    rig.body.rotation.x = entry.lean.step(frameDt, 90, 10);
     rig.body.rotation.z = Math.cos(entry.phase) * 0.11 * entry.move;
     rig.body.position.z = attacking && rig.attack === "thrust" ? Math.max(0, beat) * 2.4 : 0;
 
     // The head lags the body and wobbles back, like it is on a spring.
     entry.nod.target = -entry.lean.x * 0.6;
-    rig.head.rotation.x = entry.nod.step(frameDt, 150, 7);
+    rig.head.rotation.x = entry.nod.step(frameDt, 110, 8);
     rig.head.rotation.z = -rig.body.rotation.z * 0.9;
     const headSquash = 1 - (sy - 1) * 0.5;
     rig.head.scale.set(1 / Math.sqrt(headSquash), headSquash, 1 / Math.sqrt(headSquash));
@@ -626,8 +640,8 @@ export class Units3D {
     }
     entry.armL.target = left;
     entry.armR.target = right;
-    rig.armL.rotation.x = entry.armL.step(frameDt, 260, 13);
-    rig.armR.rotation.x = entry.armR.step(frameDt, 260, 13);
+    rig.armL.rotation.x = entry.armL.step(frameDt, 190, 14);
+    rig.armR.rotation.x = entry.armR.step(frameDt, 190, 14);
     // Arms flare out as the body squashes.
     rig.armL.rotation.z = -0.12 - Math.max(0, 1 - sy) * 0.9;
     rig.armR.rotation.z = 0.12 + Math.max(0, 1 - sy) * 0.9;

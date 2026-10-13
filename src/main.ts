@@ -442,10 +442,10 @@ async function main(): Promise<void> {
 
   const loop = new GameLoop(
     (dt) => {
-      camera.update(dt);
       game.update(dt);
     },
     (frameTime) => {
+      camera.update(frameTime);
       const pending = game.state.ui.pendingBuild;
       const hover = pending && input.pointer.inside ? hoverOrigin() : undefined;
       game.state.ui.hoverTile = hover;

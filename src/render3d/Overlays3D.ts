@@ -4,6 +4,7 @@ import { PALETTE, TILE_SIZE } from "../config/world";
 import type { PlacementResult } from "../sim/placement";
 import { def, unitDef } from "../sim/selectors";
 import type { GameState, PlayerId, Projectile, Unit } from "../sim/types";
+import type { Units3D } from "./Units3D";
 
 const LIFT = 0.9;
 const PROJECTILE_HEIGHT = 18;
@@ -48,14 +49,14 @@ export class Overlays3D {
     }
   }
 
-  update(state: GameState, placement: PlacementResult | null): void {
-    this.updateRings(state);
+  update(state: GameState, placement: PlacementResult | null, units: Units3D): void {
+    this.updateRings(state, units);
     this.updateBuilding(state);
     this.updateGhost(state, placement);
     this.updateBolts(state.projectiles);
   }
 
-  private updateRings(state: GameState): void {
+  private updateRings(state: GameState, units: Units3D): void {
     this.unitsById.clear();
     for (const unit of state.players.player.units) this.unitsById.set(unit.id, unit);
 
@@ -71,7 +72,9 @@ export class Overlays3D {
         this.scene.add(ring);
       }
       ring.visible = true;
-      ring.position.set(unit.x, LIFT, unit.y);
+      // Follow the smoothed figure, not the stepping sim position.
+      const drawn = units.drawnPosition(unit.id) ?? unit;
+      ring.position.set(drawn.x, LIFT, drawn.y);
       ring.scale.setScalar(unitDef(unit.type).radius + 7);
       used += 1;
     }

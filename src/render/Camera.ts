@@ -11,6 +11,12 @@ export class Camera {
   private viewportW = 1;
   private viewportH = 1;
   private zoom = 1;
+  // Wheel and pinch set a target; the camera eases toward it around the anchor.
+  private zoomTarget = 1;
+  private anchorX = 0;
+  private anchorY = 0;
+  private velX = 0;
+  private velZ = 0;
   private dragging = false;
   private lastX = 0;
   private lastY = 0;
@@ -36,6 +42,7 @@ export class Camera {
 
   centerOn(worldX: number, worldY: number, zoom = 1): void {
     this.zoom = Math.min(CAMERA.maxZoom, Math.max(CAMERA.minZoom, zoom));
+    this.zoomTarget = this.zoom;
     this.target.set(worldX, 0, worldY);
     this.apply();
   }
@@ -88,16 +95,9 @@ export class Camera {
 
   zoomAt(screenX: number, screenY: number, deltaY: number): void {
     const factor = Math.exp(-deltaY * 0.0012);
-    const next = Math.min(CAMERA.maxZoom, Math.max(CAMERA.minZoom, this.zoom * factor));
-    if (next === this.zoom) return;
-
-    const before = this.screenToWorld(screenX, screenY);
-    this.zoom = next;
-    this.apply();
-    const after = this.screenToWorld(screenX, screenY);
-    this.target.x += before.x - after.x;
-    this.target.z += before.y - after.y;
-    this.apply();
+    this.zoomTarget = Math.min(CAMERA.maxZoom, Math.max(CAMERA.minZoom, this.zoomTarget * factor));
+    this.anchorX = screenX;
+    this.anchorY = screenY;
   }
 
   beginDrag(screenX: number, screenY: number): void {
@@ -128,11 +128,26 @@ export class Camera {
     if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
     if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
     if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
-    if (dx === 0 && dy === 0) return;
 
+    // Ease zoom toward its target, keeping the world point under the cursor fixed.
+    if (Math.abs(this.zoomTarget - this.zoom) > 0.0005) {
+      const before = this.screenToWorld(this.anchorX, this.anchorY);
+      this.zoom += (this.zoomTarget - this.zoom) * (1 - Math.exp(-dt * 14));
+      this.apply();
+      const after = this.screenToWorld(this.anchorX, this.anchorY);
+      this.target.x += before.x - after.x;
+      this.target.z += before.y - after.y;
+      this.apply();
+    }
+
+    // Key panning accelerates and coasts to a stop instead of snapping.
     const len = Math.hypot(dx, dy) || 1;
-    this.target.x += (dx / len) * CAMERA.panSpeed * dt;
-    this.target.z += (dy / len) * CAMERA.panSpeed * dt;
+    const ease = 1 - Math.exp(-dt * 11);
+    this.velX += ((dx / len) * CAMERA.panSpeed - this.velX) * ease;
+    this.velZ += ((dy / len) * CAMERA.panSpeed - this.velZ) * ease;
+    if (Math.abs(this.velX) + Math.abs(this.velZ) < 1) return;
+    this.target.x += this.velX * dt;
+    this.target.z += this.velZ * dt;
     this.apply();
   }
 

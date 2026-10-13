@@ -47,13 +47,13 @@ export function cyl(
   x = 0,
   y = 0,
   z = 0,
-  sides = 10,
+  sides = 14,
 ): BufferGeometry {
   return paint(new CylinderGeometry(rTop, rBottom, h, sides), color).translate(x, y + h / 2, z);
 }
 
 // Cone standing on y. Four sides gives a pyramid whose base edges are axis-aligned.
-export function cone(r: number, h: number, color: number, x = 0, y = 0, z = 0, sides = 9): BufferGeometry {
+export function cone(r: number, h: number, color: number, x = 0, y = 0, z = 0, sides = 12): BufferGeometry {
   const geometry = new ConeGeometry(r, h, sides);
   if (sides === 4) geometry.rotateY(Math.PI / 4);
   return paint(geometry, color).translate(x, y + h / 2, z);
@@ -69,7 +69,15 @@ export function blob(
   squash = 1,
   detail = 1,
 ): BufferGeometry {
-  return paint(new IcosahedronGeometry(r, detail), color).scale(1, squash, 1).translate(x, y, z);
+  const geometry = new IcosahedronGeometry(r, detail);
+  // A detail-0 blob ships with faceted normals; point them outward from the
+  // centre instead so even the cheapest blob shades as a soft ball.
+  const position = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  for (let i = 0; i < position.count; i += 1) {
+    normal.setXYZ(i, position.getX(i) / r, position.getY(i) / r, position.getZ(i) / r);
+  }
+  return paint(geometry, color).scale(1, squash, 1).translate(x, y, z);
 }
 
 export function rock(r: number, color: number, x = 0, y = 0, z = 0, squash = 0.7, turn = 0): BufferGeometry {
@@ -95,15 +103,23 @@ export function gable(
   return paint(prism, color).translate(x, y, z);
 }
 
+// Roundness budget for unit primitives: 0 = cheapest, 2 = smoothest. Set once
+// from the device quality tier before any model is built.
+let roundness = 2;
+
+export function setModelRoundness(level: 0 | 1 | 2): void {
+  roundness = level;
+}
+
 const PRIMS = {
-  box: () => new RoundedBoxGeometry(1, 1, 1, 1, 0.22),
+  box: () => (roundness === 0 ? new BoxGeometry(1, 1, 1) : new RoundedBoxGeometry(1, 1, 1, roundness, 0.3)),
   // Plain box for thin plates and blades where a bevel would not read.
   slab: () => new BoxGeometry(1, 1, 1),
-  ball: () => new IcosahedronGeometry(1, 1),
+  ball: () => new IcosahedronGeometry(1, roundness === 2 ? 2 : 1),
   // Rounder sphere for heads and other focal shapes.
-  orb: () => new IcosahedronGeometry(1, 2),
-  tube: () => new CylinderGeometry(1, 1, 1, 10),
-  cone: () => new ConeGeometry(1, 1, 9),
+  orb: () => new IcosahedronGeometry(1, roundness === 2 ? 3 : 2),
+  tube: () => new CylinderGeometry(1, 1, 1, roundness === 0 ? 8 : 14),
+  cone: () => new ConeGeometry(1, 1, roundness === 0 ? 7 : 12),
 };
 
 // Unit primitive centred on the origin, then scaled, tilted about X and moved.

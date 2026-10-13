@@ -1,4 +1,4 @@
-import { Color, Fog, PCFSoftShadowMap, Scene, WebGLRenderer } from "three";
+import { Color, Fog, PCFShadowMap, Scene, WebGLRenderer } from "three";
 import { VIEW3D } from "../config/atmosphere";
 import { GRID_COLS, GRID_ROWS } from "../config/world";
 import { Camera } from "../render/Camera";
@@ -7,7 +7,7 @@ import type { GameState } from "../sim/types";
 import type { VisibilityMap } from "../sim/visibility";
 import { Bars3D } from "./Bars3D";
 import { Buildings3D } from "./Buildings3D";
-import { swayTime } from "./geo";
+import { setModelRoundness, swayTime } from "./geo";
 import { Fog3D } from "./Fog3D";
 import { Lights3D } from "./Lights3D";
 import { Overlays3D } from "./Overlays3D";
@@ -49,9 +49,10 @@ export class Scene3D {
 
   private constructor() {
     const { quality } = this;
+    setModelRoundness(quality.tier === "high" ? 2 : quality.tier === "medium" ? 1 : 0);
     this.renderer = new WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
     this.renderer.shadowMap.enabled = quality.shadows;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
     this.canvas = this.renderer.domElement;
     // Counted per frame (reset in render) so stats cover every pass.
     this.renderer.info.autoReset = false;
@@ -154,7 +155,7 @@ export class Scene3D {
     this.buildings.update(state, visibility, frameDt);
     this.units.update(state, visibility, nowSec, frameDt);
     this.bars.end();
-    this.overlays.update(state, placement);
+    this.overlays.update(state, placement, this.units);
     this.lights.update(state, visibility, this.camera, nowSec);
     this.fog.update(visibility);
 

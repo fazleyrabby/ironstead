@@ -82,6 +82,9 @@ export class Lights3D {
     this.sun.castShadow = quality.shadows;
     this.sun.shadow.mapSize.set(quality.shadowMap, quality.shadowMap);
     this.sun.shadow.bias = -0.0006;
+    // Wide PCF kernel: soft, blobby shadow edges.
+    this.sun.shadow.radius = 3.5;
+    this.sun.shadow.blurSamples = 12;
     this.sun.shadow.camera.near = 200;
     this.sun.shadow.camera.far = 5200;
     scene.add(this.sun, this.sun.target);
